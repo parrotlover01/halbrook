@@ -23,4 +23,4 @@ Settings are environment variables, never files:
 | `TEST_MODE=1` | Free test credit, no real money |
 | `TREASURY_ADDRESS`, `TREASURY_PRIVATE_KEY`, `WITHDRAWALS_ENABLED=1`, `ADMIN_TOKEN` | Real USDG deposits and withdrawals on Robinhood Chain (off in test mode) |
 
-Halbrook runs in test mode. Nothing here is investment advice.
+Halbrook runs on real USDG deposits on Robinhood Chain. Start small. Nothing here is investment advice.

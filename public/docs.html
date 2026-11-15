@@ -52,28 +52,28 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
 <body>
 <header class="top">
   <a class="brand" href="bureau.html"><img src="assets/bureau/mark.png" alt="">Halbrook</a>
-  <nav><a href="bureau.html#market">Exchange</a><a href="bureau.html#chat">Aggregator</a><a href="https://x.com/halbrookmarket" target="_blank" rel="noopener">X</a></nav>
+  <nav><a href="bureau.html#market">Exchange</a><a href="bureau.html#chat">Aggregator</a><a href="bureau.html#api">API</a><a href="https://x.com/halbrookmarket" target="_blank" rel="noopener">X</a></nav>
 </header>
 <div class="wrap">
   <aside class="toc" aria-label="Chapters"><b>Chapters</b>
-    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#chat">4. Chat</a><a href="#api">5. API key</a><a href="#fees">6. Fees</a><a href="#film">7. The film</a><a href="#faq">8. Safety and FAQ</a>
+    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#chat">4. Aggregator</a><a href="#api">5. API key</a><a href="#fees">6. Fees</a><a href="#film">7. The film</a><a href="#faq">8. Safety and FAQ</a>
   </aside>
   <main>
     <h1>Halbrook Docs</h1>
     <p class="lead">Everything you need to use Halbrook, in a five-minute read.</p>
 
     <section id="what"><h2><span>1</span>What is Halbrook</h2>
-      <p>Halbrook is an exchange for AI tokens: one wallet, one balance, every major model. You hold tokens of a model, swap them for another at the live price, and spend them in a chat that sends each question to the cheapest host.</p>
-      <div class="steps"><div><i>01</i><b>Connect wallet</b><small>sign in, free</small></div><div><i>02</i><b>Get tokens</b><small>$2 test credit</small></div><div><i>03</i><b>Swap</b><small>at the market price</small></div><div><i>04</i><b>Chat</b><small>cheapest host</small></div></div>
+      <p>Halbrook is an exchange for AI models: one wallet, one balance in USDG, every major model. Buy tokens of the models you believe in at the market price, swap between them, and use them in the Aggregator or through the API, where each request goes to the cheapest host.</p>
+      <div class="steps"><div><i>01</i><b>Connect wallet</b><small>sign in, free</small></div><div><i>02</i><b>Deposit USDG</b><small>on Robinhood Chain</small></div><div><i>03</i><b>Trade</b><small>at the market price</small></div><div><i>04</i><b>Use</b><small>Aggregator or API</small></div></div>
       <p>Prices are real and public. They come from the hosts themselves and refresh every 60 seconds.</p>
       <p>Models available today: Claude Opus 5.5, Claude Fable 5.2, GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, Gemini 4 Carbon, Mistral Large 4, DeepSeek V4 Pro and Grok 4.7.</p>
     </section>
 
     <section id="start"><h2><span>2</span>Getting started</h2>
       <p>You need a browser wallet such as MetaMask or Rabby. It takes under a minute.</p>
-      <ol><li>Open the <a href="bureau.html#market">Exchange</a>.</li><li>Click <strong>Connect wallet</strong> and accept in your wallet.</li><li>Click <strong>Sign in</strong> and sign the message. It is free: no transaction, no gas.</li><li>Your balance appears at the top of the Exchange.</li><li>While Halbrook is in test mode, click <strong>Get $2 test credit</strong> once. You receive 2,000,000 Mistral Large 4 tokens.</li></ol>
+      <ol><li>Open the <a href="bureau.html#market">Exchange</a>.</li><li>Click <strong>Connect wallet</strong> and accept in your wallet.</li><li>Click <strong>Sign in</strong> and sign the message. It is free: no transaction, no gas.</li><li>Your balance appears at the top right of the page.</li><li>Click <strong>Deposit</strong> and send USDG from that same wallet. It is credited in about a minute.</li></ol>
       <p>You stay signed in for 7 days on that browser.</p>
-      <p><strong>Deposit and withdraw (at launch).</strong> Halbrook runs on USDG, the Global Dollar by Paxos, on Robinhood Chain. Click <strong>Deposit</strong> in your balance and send USDG from your connected wallet: it is credited in about a minute. Buy any model with it, swap, use. To cash out, swap back to USDG and click <strong>Withdraw</strong>: it goes to your connected wallet. Fee: 0.50 USDG per withdrawal. Limits: 100 USDG per withdrawal and 200 per day; large withdrawals are checked by a person first.</p>
+      <p><strong>Deposit and withdraw.</strong> Halbrook runs on USDG, the Global Dollar by Paxos, on Robinhood Chain. Click <strong>Deposit</strong> at the top of the page and send USDG from your connected wallet: it is credited after 5 confirmations, usually under a minute. Only USDG, only on Robinhood Chain, only from the wallet you signed in with. Buy any model with it, swap, use. To cash out, swap back to USDG, then click your balance at the top of the page and choose <strong>Withdraw</strong>: it goes to your connected wallet. Fee: 0.50 USDG per withdrawal. Limits: 100 USDG per withdrawal and 200 per day; large withdrawals are checked by a person first.</p>
     </section>
 
     <section id="swap"><h2><span>3</span>Swap tokens between models</h2>
@@ -87,17 +87,17 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
       <p>The market table lists each model's reference price, market price, premium and cheapest host. Click a row to see where it sits in the band and every host with its price.</p>
     </section>
 
-    <section id="chat"><h2><span>4</span>Chat with your tokens</h2>
+    <section id="chat"><h2><span>4</span>Aggregator: chat with every model</h2>
       <p>Each question goes to the cheapest host for that model, and you pay only what it really cost.</p>
-      <ol><li>Open the <a href="bureau.html#chat">Aggregator</a> tab.</li><li>Pick a model you hold tokens in.</li><li>Type your question and press Enter.</li></ol>
-      <p>Under each answer: the model that wrote it, the tokens used, the price in dollars, the host it went to, and the saving against the official price. You need at least 2,000 tokens of a model to send a message.</p>
+      <ol><li>Open the <a href="bureau.html#chat">Aggregator</a> tab.</li><li>Pick any model.</li><li>Type your question and press Enter.</li></ol>
+      <p>Under each answer: the model that wrote it, the tokens used, the price in dollars, the host it went to, and the saving against the official price. Each answer is paid from your tokens of that model if you hold some, otherwise straight from your USDG at its real cost. No balance? Deposit USDG first.</p>
       <p><strong>One conversation, every model.</strong> Switch models in the middle of a conversation: the new model sees everything said before. <strong>New chat</strong> starts fresh.</p>
       <p><strong>Shared memory.</strong> Click <strong>Memory</strong> to save short notes about you or your work (“I write Python”, “my startup sells to dentists”). Every model reads them, so you never repeat yourself. Notes are encrypted on our server; <strong>Forget everything</strong> deletes them for good.</p>
     </section>
 
     <section id="api"><h2><span>5</span>API key</h2>
-      <p>Use your Halbrook balance in any app that works with OpenAI: Cursor, scripts, agents. Same tokens, same cheapest-host routing as the chat.</p>
-      <ol><li>Sign in on the <a href="bureau.html#market">Exchange</a>.</li><li>Click <strong>API key</strong> in your balance, then <strong>Create a key</strong>.</li><li>Copy it right away: it is shown only once.</li><li>In your app, set the base URL and the key.</li></ol>
+      <p>Use your Halbrook balance in any app that works with OpenAI: Cursor, scripts, agents. Same balance, same cheapest-host routing as the Aggregator, paid from your model tokens or your USDG.</p>
+      <ol><li>Sign in and open the <a href="bureau.html#api">API</a> tab.</li><li>Click <strong>Create or manage keys</strong>, then <strong>Create a key</strong>.</li><li>Copy it right away: it is shown only once.</li><li>In your app, set the base URL and the key.</li></ol>
 <pre>Base URL   https://www.halbrook.xyz/v1
 API key    hb_…
 
@@ -127,7 +127,7 @@ curl https://www.halbrook.xyz/v1/chat/completions \
 
     <section id="faq" class="faq"><h2><span>8</span>Safety and FAQ</h2>
       <p class="warn">Halbrook will never ask for your seed phrase or private key. If anyone does, it is a scam.</p>
-      <p><strong>Is it real money?</strong>Not yet. Halbrook runs in test mode with free test credit. At launch, deposits and withdrawals open in USDG on Robinhood Chain, and every test balance goes back to zero.</p>
+      <p><strong>Is it real money?</strong>Yes. Deposits and withdrawals are in USDG on Robinhood Chain. Halbrook holds the USDG you deposit and keeps your balance on its server, like an exchange: there is no Halbrook smart contract. Start small.</p>
       <p><strong>What does signing in do?</strong>It proves you own the wallet. It moves no funds and costs no gas.</p>
       <p><strong>What is $HALBROOK?</strong>Nothing is on sale. The name is reserved for later.</p>
       <p><strong>Something looks wrong?</strong>Write to us on X: <a href="https://x.com/halbrookmarket" target="_blank" rel="noopener">@halbrookmarket</a>. Code: <a href="https://github.com/parrotlover01/halbrook" target="_blank" rel="noopener">GitHub</a>.</p>
