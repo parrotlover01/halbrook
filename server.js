@@ -722,4 +722,8 @@ server.listen(PORT, async () => {
   await refreshPrices(); setInterval(refreshPrices, 60_000);
   if (LIVE) { setInterval(scanDeposits, 15_000); setInterval(processWithdrawals, 20_000); scanDeposits(); }
   console.log(LIVE ? `real money: deposits to ${TREASURY}, withdrawals ${WD_ON ? 'on' : 'off'}` : 'test money only');
+  if (WD_ON) {   // check the key matches the treasury; only the public address is ever logged
+    try { const a = hot().wallet.account.address; console.log('hot wallet', a, a.toLowerCase() === TREASURY.toLowerCase() ? '(same as the treasury address)' : '(DIFFERENT from TREASURY_ADDRESS: deposits and withdrawals use two wallets)'); }
+    catch (e) { console.error('TREASURY_PRIVATE_KEY is not a valid private key: withdrawals cannot be sent'); }
+  }
 });
