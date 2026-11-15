@@ -1607,6 +1607,7 @@ async function loadHist() {
 async function sendDeposit() {
   const F = FD(), v = Math.round((+$('fdAmt').value || 0) * 1e6), msg = t => { $('fdSend').textContent = t; };
   if (!(v >= 1e6)) return msg('At least 1 USDG');
+  if (!window.ethereum) return msg('No wallet found in this browser');
   if (!me) { await signIn(); if (!me) return; }
   try {
     const hex = '0x' + F.chainId.toString(16);
@@ -1619,7 +1620,15 @@ async function sendDeposit() {
     await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: me.address, to: F.usdg, data }] });
     msg('Sent · credited in about a minute');
     let n = 0; const t = setInterval(async () => { await loadMe(); loadHist(); if (++n > 12) clearInterval(t); }, 10000);
-  } catch (e) { msg(e && e.code === 4001 ? 'Cancelled' : 'Could not send'); }
+  } catch (e) {
+    const t = String((e && (e.data && e.data.message || e.message)) || '').toLowerCase();
+    msg(e && e.code === 4001 ? 'Cancelled'
+      : /insufficient funds|gas/.test(t) ? 'Not enough ETH on Robinhood Chain for the network fee'
+      : /exceeds balance|transfer amount|insufficient balance/.test(t) ? 'Not enough USDG on Robinhood Chain in this wallet'
+      : /chain|network/.test(t) ? 'Switch your wallet to Robinhood Chain and try again'
+      : 'Could not send: ' + (e && e.message ? e.message.slice(0, 70) : 'unknown error'));
+    $('fdSend').title = (e && e.message) || '';
+  }
 }
 async function doWithdraw() {
   const amount = +$('fdWdAmt').value || 0, b = $('fdWdGo');
