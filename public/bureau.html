@@ -586,6 +586,10 @@ footer a{color:var(--muted)}
 .hdr-dep:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1px 0 #7d1020}
 .hdr-bal{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 0 rgba(0,0,0,.6)}
 @media (prefers-reduced-motion:reduce){.tx .mk-row:not(.mk-h):hover,.tx .sw-flip:hover{transform:none}}
+.tx-lab{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tx-have{font:400 12px/1 var(--m);color:var(--muted);white-space:nowrap}.tx-have b{color:#fff;font-weight:500}
+.tx-max{margin-left:6px;padding:4px 8px;border:0;border-radius:6px;background:rgba(255,255,255,.1);color:#fff;font:600 11px/1 var(--b);letter-spacing:.04em;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 0 rgba(0,0,0,.5)}
+.tx-max:hover{background:rgba(255,255,255,.18)}
 /* tidy */
 .mk{align-items:start}
 .sw-in span{white-space:nowrap}
@@ -672,9 +676,9 @@ html,body{overflow-x:clip}
     <aside class="tx-card" aria-label="Trade">
       <div id="mkSide" aria-live="polite"></div>
       <div class="tx-swap">
-        <div class="tx-field"><label for="swAmt">You give</label><div class="tx-row"><input id="swAmt" type="number" min="0" step="0.1" value="1" inputmode="decimal" aria-label="Amount in million tokens"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" aria-label="From model"></select></div></div>
+        <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="number" min="0" step="0.1" value="1" inputmode="decimal" aria-label="Amount in million tokens"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" aria-label="From model"></select></div></div>
         <button class="sw-flip" id="swFlip" type="button" aria-label="Swap direction">⇅</button>
-        <div class="tx-field"><label>You get</label><div class="tx-row"><div class="sw-out" id="swOut">—</div><span class="tx-ico" id="swToIco"></span><select id="swTo" aria-label="To model"></select></div></div>
+        <div class="tx-field"><div class="tx-lab"><label>You get</label><span class="tx-have" id="swHaveTo"></span></div><div class="tx-row"><div class="sw-out" id="swOut">—</div><span class="tx-ico" id="swToIco"></span><select id="swTo" aria-label="To model"></select></div></div>
         <div class="sw-rate" id="swRate">—</div>
         <button class="sw-go" id="swGo" type="button">Swap</button>
         <p class="sw-note" id="swNote">Market price · 0.3% fee · your swap moves the premium</p>
@@ -858,6 +862,7 @@ function renderAcct() {
   const kb = $('acctKeys'); if (kb) kb.onclick = openKeys;
   const dp = $('acctDep'); if (dp) dp.onclick = () => openFunds('dep');
   const wd = $('acctWd'); if (wd) wd.onclick = () => openFunds('wd');
+  if ($('swFrom') && $('swFrom').options.length) renderSwap();
   const fa = $('acctFaucet'); if (fa) fa.onclick = async () => { const r = await api('/api/faucet', { method: 'POST' }); if (r.ok) await loadMe(); else flash(r.error); };
 }
 const AGENTS = [
@@ -1044,6 +1049,14 @@ function renderSwap() {
   document.querySelector('.tx-u').textContent = a === 'usdg' ? '' : 'M';
   const ico = id => id === 'usdg' ? '<span class="usd">$</span>' : brand((MK.find(x => x.id === id) || {}).logo);
   $('swFromIco').innerHTML = ico(a); $('swToIco').innerHTML = ico(b);
+  const own = id => { const x = me && me.balances.find(y => y.model === id); return x ? x.tokens : 0; };
+  const fmtHave = (id, u) => id === 'usdg' ? '$' + (u / 1e6).toFixed(2) : fmtTok(u);
+  if (me) {
+    const hf = own(a), ht = own(b);
+    $('swHave').innerHTML = `Balance: <b>${fmtHave(a, hf)}</b>` + (hf ? ' <button type="button" class="tx-max">Max</button>' : '');
+    $('swHaveTo').innerHTML = `Balance: <b>${fmtHave(b, ht)}</b>`;
+    const mx = $('swHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('swAmt').value = String(Math.floor(hf / 1e4) / 100); renderSwap(); };
+  } else { $('swHave').textContent = ''; $('swHaveTo').textContent = ''; }
   $('swOut').textContent = show(b, out * 1e6);
   $('swRate').innerHTML = a === 'usdg' ? `$1 = <b>${fmtM(rate)}</b> ${t.name}` : b === 'usdg' ? `1M ${f.name} = <b>$${rate.toFixed(2)}</b>` : `1M ${f.name} = <b>${fmtM(rate)}</b> ${t.name}`;
   clearTimeout(quoteT); if (!cfg || !amt || a === b) return;
