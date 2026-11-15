@@ -167,28 +167,32 @@ async function reserve(user, model, messages, maxOut) {
   if (Number(spent.rows[0].usd) >= CHAT_DAILY_USD) return { code: 503, error: 'Halbrook has reached its daily usage limit. Back tomorrow.' };
   const chars = JSON.stringify(messages).length;
   // long prompt, full answer, host up to 25% above the official price, plus the margin
-  const hold = Math.max(2000, Math.ceil((chars / 3 * P.pin + maxOut * P.pout) * 1.25 * (1 + MARGIN) / P.blend));
-  const { rowCount } = await db.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2 AND amount >= $3', [user, model, hold]);
-  if (!rowCount) return { code: 402, error: 'Not enough tokens for this model. Swap some first, or send a shorter request.' };
-  return { user, model, P, hold };
+  const worstUsd = (chars / 3 * P.pin + maxOut * P.pout) * 1.25 * (1 + MARGIN);
+  // pay with this model's tokens if you hold enough, otherwise straight from your USDG at the real cost
+  for (const [payIn, unit, min] of [[model, P.blend, 2000], [USDG, 1e-6, 10_000]]) {
+    const hold = Math.max(min, Math.ceil(worstUsd / unit));
+    const { rowCount } = await db.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2 AND amount >= $3', [user, payIn, hold]);
+    if (rowCount) return { user, model, P, payIn, unit, hold };
+  }
+  return { code: 402, error: 'Not enough tokens for this model, and not enough USDG. Deposit USDG or swap some first.' };
 }
-async function release(h) { await db.query('UPDATE balances SET amount = amount + $3 WHERE address = $1 AND model = $2', [h.user, h.model, h.hold]); }
+async function release(h) { await db.query('UPDATE balances SET amount = amount + $3 WHERE address = $1 AND model = $2', [h.user, h.payIn, h.hold]); }
 async function settle(h, usage, provider, meta) {
   const u = usage || {}, pin = u.prompt_tokens || 0, pout = u.completion_tokens || 0, P = h.P;
   const refCost = pin * P.pin + pout * P.pout;                                  // what the official price would charge
   const paid = typeof u.cost === 'number' && u.cost >= 0 ? u.cost : refCost;    // what the routed host actually charged
   const charge = paid * (1 + MARGIN);                                           // what the user pays
-  const debit = Math.ceil(charge / P.blend);                                    // in this model's tokens
+  const debit = Math.ceil(charge / h.unit);                                     // in this model's tokens, or in micro-USDG
   const back = h.hold - debit;                                                  // unused part of the reservation
   const c = await db.connect();
   try {
     await c.query('BEGIN');
-    await c.query('UPDATE balances SET amount = GREATEST(amount + $3, 0) WHERE address = $1 AND model = $2', [h.user, h.model, back]);
-    await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'chat',$2,$3,$4)", [h.user, h.model, -debit, JSON.stringify({ pin, pout, paid, refCost, provider: typeof provider === 'string' ? provider.slice(0, 60) : null, ...meta })]);
+    await c.query('UPDATE balances SET amount = GREATEST(amount + $3, 0) WHERE address = $1 AND model = $2', [h.user, h.payIn, back]);
+    await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'chat',$2,$3,$4)", [h.user, h.payIn, -debit, JSON.stringify({ model: h.model, pin, pout, paid, refCost, provider: typeof provider === 'string' ? provider.slice(0, 60) : null, ...meta })]);
     if (meta && meta.key) await c.query('UPDATE api_keys SET spent = spent + $2, last_used = now() WHERE id = $1', [meta.key, charge]);
     await c.query('COMMIT');
   } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
-  return { pin, pout, refCost, paid, charge, debit };
+  return { pin, pout, refCost, paid, charge, debit, payIn: h.payIn };
 }
 function upstream(body, stream = false) {
   return fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -533,7 +537,7 @@ async function api(req, res, p) {
       if (!r.ok) { await release(hold); console.error('chat upstream', r.status, j.error && j.error.message); return send(res, 502, { error: 'The model did not answer. Try again in a moment.' }); }
       const bill = await settle(hold, j.usage, j.provider, { via: 'chat' });
       const text = j.choices && j.choices[0] && j.choices[0].message ? String(j.choices[0].message.content || '') : '';
-      return send(res, 200, { reply: text, provider: typeof j.provider === 'string' ? j.provider.slice(0, 60) : null, tokensIn: bill.pin, tokensOut: bill.pout, charged: bill.charge, officialCost: bill.refCost * (1 + MARGIN), debit: bill.debit, balances: await balances(user) });
+      return send(res, 200, { reply: text, provider: typeof j.provider === 'string' ? j.provider.slice(0, 60) : null, tokensIn: bill.pin, tokensOut: bill.pout, charged: bill.charge, officialCost: bill.refCost * (1 + MARGIN), debit: bill.debit, paidIn: bill.payIn === 'usdg' ? 'usdg' : 'tokens', balances: await balances(user) });
     }
 
     /* shared memory */
@@ -635,7 +639,7 @@ async function v1(req, res, p) {
         const bill = await settle(hold, j.usage, j.provider, { via: 'api', key: keyId });
         if (j.usage) { delete j.usage.cost; delete j.usage.cost_details; delete j.usage.is_byok; }
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
-        return res.end(JSON.stringify({ ...j, model, halbrook: { charged_usd: bill.charge, official_usd: bill.refCost * (1 + MARGIN), host: j.provider || null, debited_tokens: bill.debit } }));
+        return res.end(JSON.stringify({ ...j, model, halbrook: { charged_usd: bill.charge, official_usd: bill.refCost * (1 + MARGIN), host: j.provider || null, paid_in: bill.payIn === 'usdg' ? 'usdg' : 'model_tokens', debited: bill.debit } }));
       }
       // streaming: pass the events through as they come, keep the last usage block to bill it
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', ...CORS });

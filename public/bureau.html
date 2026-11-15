@@ -509,6 +509,7 @@ footer a{color:var(--muted)}
 .tx-row select{max-width:44%}
 .tx-row .sw-out,.tx-row input{font-size:22px}
 .chat-tot{color:#fff}
+.ch-dep{margin-left:6px;padding:7px 12px;font-size:12px}
 .chat-top select{field-sizing:content}
 /* model menus: our own chevron with room to breathe instead of the system arrow */
 .chat-top select,.tx-row select{-webkit-appearance:none;appearance:none;padding:10px 40px 10px 14px;cursor:pointer;
@@ -1024,7 +1025,9 @@ function renderChatTop() {
   const cb = $('chBal');
   if (!me) { cb.innerHTML = `<button class="acct-b" type="button">${account ? 'Sign in to chat' : 'Connect wallet to chat'}</button>`; cb.firstChild.onclick = () => (account ? signIn() : connectWallet().then(x => x && signIn())); }
   else { const tot = me.balances.reduce((a, x) => a + (x.usd || 0), 0);
-    cb.innerHTML = (b ? `${fmtTok(b.tokens)} tokens · $${(b.usd || 0).toFixed(2)}` : 'No tokens in this model · swap some first') + ` · <span class="chat-tot">your balance $${tot.toFixed(2)}</span>`; }
+    const u = me.balances.find(x => x.model === 'usdg'), usd = u ? u.tokens / 1e6 : 0;
+    cb.innerHTML = (b ? `${fmtTok(b.tokens)} tokens · $${(b.usd || 0).toFixed(2)}` : usd > 0 ? `Paid from your USDG · $${usd.toFixed(2)} left` : 'No balance yet') + ` · <span class="chat-tot">your balance $${tot.toFixed(2)}</span> <button class="acct-b acct-dep ch-dep" type="button">Deposit</button>`;
+    cb.querySelector('.ch-dep').onclick = () => openFunds('dep'); }
   renderLog();
 }
 // Small, safe Markdown for answers: everything is escaped first, then only a few tags are added back
@@ -1064,7 +1067,7 @@ $('chForm').addEventListener('submit', async e => {
   $('chSend').disabled = false; list.pop();
   if (!r.ok) { list.push({ role: 'assistant', content: r.error || 'No answer', err: true }); renderLog(); return; }
   const saved = r.officialCost > 0 ? Math.max(0, (1 - r.charged / r.officialCost) * 100) : 0;
-  list.push({ role: 'assistant', by: nameOf(model), logo: (MK.find(x => x.id === model) || {}).logo, content: r.reply || '(empty answer)', meta: `${r.tokensIn + r.tokensOut} tokens · $${r.charged.toFixed(4)}${r.provider ? ' · routed to ' + esc(r.provider) : ''}${saved >= 1 ? ` · ${saved.toFixed(0)}% below official` : ''}` });
+  list.push({ role: 'assistant', by: nameOf(model), logo: (MK.find(x => x.id === model) || {}).logo, content: r.reply || '(empty answer)', meta: `${r.tokensIn + r.tokensOut} tokens · $${r.charged.toFixed(4)}${r.provider ? ' · routed to ' + esc(r.provider) : ''}${r.paidIn === 'usdg' ? ' · paid in USDG' : ''}${saved >= 1 ? ` · ${saved.toFixed(0)}% below official` : ''}` });
   me.balances = r.balances; renderAcct(); renderChatTop();
 });
 $('chNew').onclick = () => { thread.length = 0; renderLog(); $('chText').focus(); };
