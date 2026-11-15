@@ -97,7 +97,7 @@ async function refreshPrices() {
     const all = (await r.json()).data, next = {};
     for (const m of all) if (MODELS.includes(m.id)) {
       const pin = +m.pricing.prompt || 0, pout = +m.pricing.completion || 0;
-      next[m.id] = { name: m.name.replace(/^[^:]+:\s*/, ''), pin, pout, blend: (3 * pin + pout) / 4 };
+      next[m.id] = { name: String(m.name || m.id).replace(/^[^:]+:\s*/, '').replace(/[<>"'&`]/g, '').slice(0, 60), pin, pout, blend: (3 * pin + pout) / 4 };
     }
     if (Object.keys(next).length) { PRICES = next; await anchorMarket().catch(e => console.error('anchor', e.message)); }
   } catch (e) { console.error('prices', e.message); }
@@ -617,6 +617,7 @@ async function v1(req, res, p) {
       if (!m || !ROLES.has(m.role)) return oaErr(res, 400, 'Each message needs a valid role');
       const o = { role: m.role, content: m.content == null ? '' : m.content };
       if (typeof o.content !== 'string' && !Array.isArray(o.content)) return oaErr(res, 400, 'content must be a string or an array');
+      if (Array.isArray(o.content) && !o.content.every(x => x && x.type === 'text' && typeof x.text === 'string')) return oaErr(res, 400, 'Text only for now: images, audio and files are not supported');
       for (const f of ['name', 'tool_calls', 'tool_call_id']) if (m[f] != null) o[f] = m[f];
       messages.push(o);
     }
@@ -654,7 +655,7 @@ async function v1(req, res, p) {
           if (!res.destroyed) res.write(text);   // if the client left, keep reading so the real cost is still known
         }
       } catch (e) { console.error('v1 stream', e.message); }
-      await settle(hold, usage || { prompt_tokens: 0, completion_tokens: maxOut }, provider, { via: 'api', key: keyId, stream: true });
+      await settle(hold, usage || { prompt_tokens: Math.ceil(JSON.stringify(messages).length / 3), completion_tokens: maxOut }, provider, { via: 'api', key: keyId, stream: true });
       if (!res.destroyed) res.end();
     } finally { done(); }
   } catch (e) {
