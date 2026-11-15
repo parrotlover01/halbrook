@@ -549,6 +549,43 @@ footer a{color:var(--muted)}
 .note-act{background:none;border:0;padding:0;margin-left:4px;color:#fff;font:600 12.5px var(--b);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .ch-act{align-self:flex-start;margin:2px 0 0;padding:8px 14px;border-radius:999px;background:linear-gradient(180deg,#ff5a6c,#c81d31);text-decoration:none;font-size:13px}
 .fd-empty{padding:14px;border-radius:12px;background:rgba(239,90,111,.08);box-shadow:inset 0 0 0 1px rgba(239,90,111,.3);color:#ffd5da!important;font-size:13.5px!important}
+/* ---------- Exchange in relief ---------- */
+/* logos as 3D coins in their brand colour */
+.tx .brand,.tx-model .brand,.tx-ico .brand{border-radius:50%;
+  background:radial-gradient(circle at 32% 26%,color-mix(in srgb,var(--c) 68%,#fff 24%),color-mix(in srgb,var(--c) 62%,#0b0b0e) 52%,color-mix(in srgb,var(--c) 32%,#050506) 100%);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.45),inset 0 -4px 8px rgba(0,0,0,.45),0 3px 0 color-mix(in srgb,var(--c) 35%,#000),0 10px 18px -6px rgba(0,0,0,.8),0 0 22px -6px color-mix(in srgb,var(--c) 70%,transparent)}
+.tx .brand::after,.tx-model .brand::after,.tx-ico .brand::after{inset:12%;border-radius:50%;background:none;box-shadow:inset 0 1px 0 rgba(0,0,0,.3),inset 0 -1px 0 rgba(255,255,255,.18)}
+.tx .brand img,.tx-model .brand img,.tx-ico .brand img{filter:drop-shadow(0 2px 2px rgba(0,0,0,.55)) drop-shadow(0 -1px 0 rgba(255,255,255,.3))}
+.tx-ico .usd{border-radius:50%;box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 8px rgba(0,0,0,.4),0 3px 0 #0a2a1c,0 8px 14px -6px #000}
+/* market rows lift on hover, the chosen one stays raised */
+.tx .mk-row:not(.mk-h){transition:transform .18s ease,box-shadow .18s ease,background .18s}
+.tx .mk-row:not(.mk-h):hover{transform:translateY(-2px);box-shadow:0 12px 24px -14px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.05)}
+.tx .mk-row.sel{box-shadow:inset 3px 0 0 var(--scarlet),inset 0 1px 0 rgba(255,255,255,.06)}
+.tx .mk-m .brand{border-radius:50%}
+/* premium chips with volume */
+.tx .prem,.tx-price .prem{box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 0 rgba(0,0,0,.5),0 6px 12px -6px rgba(0,0,0,.8)}
+.tx .prem.pu,.tx-price .prem.pu{background:linear-gradient(180deg,rgba(95,211,154,.28),rgba(95,211,154,.08))}
+.tx .prem.pd,.tx-price .prem.pd{background:linear-gradient(180deg,rgba(239,90,111,.3),rgba(239,90,111,.08))}
+/* band: a recessed track and a 3D knob */
+.mk-band,.tx-card .mkt-bar{box-shadow:inset 0 1px 2px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.06)}
+.mk-band i,.tx-card .mkt-bar i{background:radial-gradient(circle at 35% 30%,#fff,#d9d4cc 55%,#8f8b98);box-shadow:0 2px 0 rgba(0,0,0,.6),0 4px 10px rgba(0,0,0,.7),0 0 0 2px rgba(10,10,13,.9)}
+.tx-card .mkt-bar i{width:16px;height:16px}
+/* the trade card floats; its fields are pressed in */
+.tx-card,.tx-list{box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 2px 0 rgba(0,0,0,.6),0 40px 70px -30px rgba(0,0,0,.95)}
+.tx-field{background:linear-gradient(180deg,#0a0a0d,#101014);box-shadow:inset 0 2px 6px rgba(0,0,0,.75),inset 0 -1px 0 rgba(255,255,255,.05),0 1px 0 rgba(255,255,255,.04)}
+.tx-row select{background-color:#16161b;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 2px 0 rgba(0,0,0,.55),0 6px 12px -8px #000}
+/* flip button: a raised disc that turns */
+.tx .sw-flip{background:radial-gradient(circle at 35% 30%,#2a2a31,#121216);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 3px 0 #000,0 8px 16px -6px #000;transition:transform .25s ease}
+.tx .sw-flip:hover{transform:rotate(180deg)}
+/* Swap: a real button that sinks when pressed */
+.tx .sw-go{position:relative;background:linear-gradient(180deg,#ff6b7c,#d92a3f 60%,#c21d31);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 5px 0 #7d1020,0 14px 26px -8px rgba(227,37,58,.6);transition:transform .08s ease,box-shadow .08s ease}
+.tx .sw-go:hover{filter:brightness(1.06)}
+.tx .sw-go:active{transform:translateY(4px);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 0 #7d1020,0 6px 14px -8px rgba(227,37,58,.6)}
+/* header Deposit and balance get the same feel */
+.hdr-dep{box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 3px 0 #7d1020,0 10px 20px -8px rgba(227,37,58,.6);transition:transform .08s,box-shadow .08s}
+.hdr-dep:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1px 0 #7d1020}
+.hdr-bal{box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 0 rgba(0,0,0,.6)}
+@media (prefers-reduced-motion:reduce){.tx .mk-row:not(.mk-h):hover,.tx .sw-flip:hover{transform:none}}
 /* tidy */
 .mk{align-items:start}
 .sw-in span{white-space:nowrap}
