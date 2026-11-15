@@ -545,6 +545,10 @@ footer a{color:var(--muted)}
 .hdr-bal em{font-style:normal;font-size:12px;color:var(--muted);padding-left:10px;border-left:1px solid rgba(255,255,255,.15)}
 .hdr-bal:hover{border-color:rgba(255,255,255,.45)}.hdr-bal:hover em{color:#fff}
 @media (max-width:480px){.hdr-bal{padding:9px 10px;margin-right:0}.hdr-bal em{display:none}.hdr-bal:not([hidden])+.hdr-dep{display:none}}
+.sw-warn{color:#ffb3bb}
+.note-act{background:none;border:0;padding:0;margin-left:4px;color:#fff;font:600 12.5px var(--b);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.ch-act{align-self:flex-start;margin:2px 0 0;padding:8px 14px;border-radius:999px;background:linear-gradient(180deg,#ff5a6c,#c81d31);text-decoration:none;font-size:13px}
+.fd-empty{padding:14px;border-radius:12px;background:rgba(239,90,111,.08);box-shadow:inset 0 0 0 1px rgba(239,90,111,.3);color:#ffd5da!important;font-size:13.5px!important}
 /* tidy */
 .mk{align-items:start}
 .sw-in span{white-space:nowrap}
@@ -1018,12 +1022,23 @@ function renderSwap() {
 }
 ['swAmt', 'swFrom', 'swTo'].forEach(i => $(i).addEventListener('input', renderSwap));
 $('swFlip').addEventListener('click', () => { const a = $('swFrom').value; $('swFrom').value = $('swTo').value; $('swTo').value = a; renderSwap(); });
+const held = id => { const b = me && me.balances.find(x => x.model === id); return b ? b.tokens : 0; };
+const totalUsd = () => me ? me.balances.reduce((a, x) => a + (x.usd || 0), 0) : 0;
+function swMsg(text, action) {
+  $('swNote').innerHTML = `<span class="sw-warn">${esc(text)}</span>` + (action === 'deposit' ? ' <button type="button" class="note-act">Deposit USDG</button>' : '');
+  const b = $('swNote').querySelector('.note-act'); if (b) b.onclick = () => openFunds('dep');
+}
 $('swGo').addEventListener('click', async () => {
   if (!cfg) { $('swNote').textContent = 'Swaps run on halbrook.xyz.'; return; }
   if (!me) { await signIn(); if (!me) return; }
-  const tokens = Math.floor((+$('swAmt').value || 0) * 1e6);
-  const r = await api('/api/swap', { method: 'POST', body: JSON.stringify({ from: $('swFrom').value, to: $('swTo').value, tokens }) });
-  if (!r.ok) { $('swNote').textContent = r.error || 'Swap failed'; return; }
+  const tokens = Math.floor((+$('swAmt').value || 0) * 1e6), from = $('swFrom').value, fromName = from === 'usdg' ? 'USDG' : nameOf(from);
+  if (!(tokens > 0)) return swMsg('Enter an amount to swap.');
+  if (!totalUsd()) return swMsg('Your balance is empty. Deposit USDG first, then swap it into any model.', 'deposit');
+  const have = held(from);
+  if (!have) return swMsg(`You don't hold any ${fromName}. Pick something you hold in "You give", or deposit USDG.`, 'deposit');
+  if (tokens > have) return swMsg(`You only have ${from === 'usdg' ? '$' + (have / 1e6).toFixed(2) : fmtTok(have)} ${fromName}. Lower the amount, or deposit more.`, 'deposit');
+  const r = await api('/api/swap', { method: 'POST', body: JSON.stringify({ from, to: $('swTo').value, tokens }) });
+  if (!r.ok) { swMsg(r.error || 'Swap failed. Try again.', /enough/i.test(r.error || '') ? 'deposit' : null); return; }
   $('swNote').textContent = `Swapped ${fmtTok(r.gave)} ${nameOf($('swFrom').value)} → ${fmtTok(r.got)} ${nameOf($('swTo').value)}`;
   me.balances = r.balances; renderAcct(); renderChatTop(); loadMkt();
 });
@@ -1066,21 +1081,23 @@ function md(src) {
 }
 function renderLog() {
   const list = thread;
-  $('chLog').innerHTML = list.length ? list.map(m => `<div class="msg ${m.role}">${m.by ? `<span class="who-m">${m.logo ? brand(m.logo) : ''}${esc(m.by)}</span>` : ''}<div class="bubble">${m.role === 'assistant' && !m.err ? md(m.content) : esc(m.content).replace(/\n/g, '<br>')}</div>${m.meta ? `<div class="meta">${m.meta}</div>` : ''}</div>`).join('') : '<p class="chat-empty">Pick a model you hold tokens in, then ask anything. Switch models anytime: the conversation follows.</p>';
+  $('chLog').innerHTML = list.length ? list.map(m => `<div class="msg ${m.role}">${m.by ? `<span class="who-m">${m.logo ? brand(m.logo) : ''}${esc(m.by)}</span>` : ''}<div class="bubble">${m.role === 'assistant' && !m.err ? md(m.content) : esc(m.content).replace(/\n/g, '<br>')}</div>${m.meta ? `<div class="meta">${m.meta}</div>` : ''}${m.action === 'deposit' ? '<button type="button" class="note-act ch-act">Deposit USDG</button>' : ''}</div>`).join('') : '<p class="chat-empty">Pick a model you hold tokens in, then ask anything. Switch models anytime: the conversation follows.</p>';
   $('chLog').scrollTop = 1e9;
 }
 $('chModel').addEventListener('change', renderChatTop);
+$('chLog').addEventListener('click', e => { if (e.target.closest('.ch-act')) openFunds('dep'); });
 $('chText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('chForm').requestSubmit(); } });
 $('chForm').addEventListener('submit', async e => {
   e.preventDefault();
   const text = $('chText').value.trim(); if (!text) return;
   if (!cfg) return; if (!me) { await signIn(); if (!me) return; }
   const model = $('chModel').value, list = thread;
+  if (!totalUsd()) { list.push({ role: 'user', content: text }, { role: 'assistant', content: 'Your balance is empty. Deposit USDG to start chatting: each answer is paid from it, at its real cost.', err: true, action: 'deposit' }); $('chText').value = ''; renderLog(); return; }
   list.push({ role: 'user', content: text }); $('chText').value = ''; list.push({ role: 'assistant', content: '…', pending: true }); renderLog();
   $('chSend').disabled = true;
   const r = await api('/api/chat', { method: 'POST', body: JSON.stringify({ model, messages: list.filter(m => !m.pending && !m.err).map(({ role, content }) => ({ role, content })) }) });
   $('chSend').disabled = false; list.pop();
-  if (!r.ok) { list.push({ role: 'assistant', content: r.error || 'No answer', err: true }); renderLog(); return; }
+  if (!r.ok) { const poor = r.status === 402; list.push({ role: 'assistant', content: poor ? `Not enough balance for ${nameOf(model)}. Deposit USDG, or pick a model you hold tokens in.` : (r.error || 'No answer. Try again in a moment.'), err: true, action: poor ? 'deposit' : null }); renderLog(); return; }
   const saved = r.officialCost > 0 ? Math.max(0, (1 - r.charged / r.officialCost) * 100) : 0;
   list.push({ role: 'assistant', by: nameOf(model), logo: (MK.find(x => x.id === model) || {}).logo, content: r.reply || '(empty answer)', meta: `${r.tokensIn + r.tokensOut} tokens · $${r.charged.toFixed(4)}${r.provider ? ' · routed to ' + esc(r.provider) : ''}${r.paidIn === 'usdg' ? ' · paid in USDG' : ''}${saved >= 1 ? ` · ${saved.toFixed(0)}% below official` : ''}` });
   me.balances = r.balances; renderAcct(); renderChatTop();
@@ -1160,7 +1177,8 @@ async function openFunds(tab) {
     <h3>Withdraw USDG</h3>
     <p>${wdOpen ? `Withdrawals go to your connected wallet ${me ? `<code>${esc(short(me.address))}</code>` : ''}. Swap tokens to USDG first.` : 'Withdrawals open at launch. Swap tokens to USDG, then withdraw them to your wallet.'}</p>
     <div class="fd-avail"><span>Available</span><b>$${usdgBal().toFixed(2)}</b></div>
-    ${wdOpen ? `<div class="fd-send"><input id="fdWdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button class="sw-go" type="button" id="fdWdGo">Withdraw</button></div>
+    ${wdOpen && !usdgBal() ? `<p class="fd-empty">Nothing to withdraw yet. Withdrawals are paid in USDG: on the Exchange, swap your tokens with "You get: USDG", then come back here.</p>` : ''}
+    ${wdOpen && usdgBal() ? `<div class="fd-send"><input id="fdWdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button class="sw-go" type="button" id="fdWdGo">Withdraw</button></div>
     <p class="fd-warn">Fee ${(F.wdFee || 0).toFixed(2)} USDG per withdrawal. Up to ${F.wdMax} USDG per withdrawal and ${F.wdDaily} per day. Above ${F.wdAuto} USDG, a person checks it first.</p>` : ''}`;
   if ($('fdCopy')) $('fdCopy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(F.address).then(() => { $('fdCopy').textContent = 'Copied'; });
   if ($('fdSend')) $('fdSend').onclick = sendDeposit;
@@ -1192,6 +1210,8 @@ async function sendDeposit() {
 }
 async function doWithdraw() {
   const amount = +$('fdWdAmt').value || 0, b = $('fdWdGo');
+  if (!(amount > 0)) { b.textContent = 'Enter an amount'; return; }
+  if (amount > usdgBal()) { b.textContent = `You have $${usdgBal().toFixed(2)}`; return; }
   b.disabled = true; const r = await api('/api/withdraw', { method: 'POST', body: JSON.stringify({ amount }) }); b.disabled = false;
   if (!r.id) { b.textContent = r.error || 'Could not withdraw'; return; }
   b.textContent = r.status === 'review' ? 'Requested · being checked' : 'Requested · sending';
