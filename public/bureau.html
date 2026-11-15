@@ -516,6 +516,24 @@ footer a{color:var(--muted)}
   background-repeat:no-repeat;background-position:right 15px center;background-size:12px 8px}   /* width of the chosen model, not of the longest option */
 .chat-top{flex-wrap:wrap;row-gap:10px}.chat-bal{white-space:normal}
 .fd-get{font-size:13px!important}.fd-get a{color:#fff}
+.api-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;max-width:1100px;margin:0 auto}
+.api-card{padding:24px;border-radius:18px;background:linear-gradient(180deg,#121216,#0a0a0d);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:14px;min-width:0}
+.api-card h3{margin:0;font:500 18px/1.2 var(--b);color:#fff}
+.api-wide{grid-column:1/-1}
+.api-p{margin:0;color:#bdb8b0;font-size:13.5px;line-height:1.55}.api-p code{font:500 12.5px var(--m);color:#fff}
+.api-base{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:#050506;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.api-base span{font:500 11px/1 var(--b);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}.api-base code{font:500 13px var(--m);color:#fff;overflow-wrap:anywhere}
+.api-tabs{display:flex;gap:4px;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);width:max-content}
+.api-tabs button{border:0;background:none;color:var(--muted);padding:8px 14px;border-radius:9px;font:500 13px var(--b);cursor:pointer}
+.api-tabs button[aria-pressed="true"]{background:#fff;color:#000}
+.api-code{min-height:190px;white-space:pre;overflow-x:auto}
+.api-models{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.api-m{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.api-m .brand{width:34px;height:34px;border-radius:10px}.api-m .brand img{width:17px;height:17px}
+.api-m span{flex:1;min-width:0}.api-m b{display:block;font:500 14px var(--b);color:#fff}.api-m code{font:400 12px var(--m);color:var(--muted)}
+.api-m em{font-style:normal;font:500 13px var(--m);color:#fff;white-space:nowrap}
+@media (max-width:860px){.api-grid{grid-template-columns:minmax(0,1fr)}}
+.tx-row select{max-width:52%;padding-right:34px;background-position:right 12px center}
 /* tidy */
 .mk{align-items:start}
 .sw-in span{white-space:nowrap}
@@ -565,7 +583,7 @@ html,body{overflow-x:clip}
 <div class="topbar"><header class="site-top">
   <a class="site-mark" href="./"><b>Halbrook</b><small>AI Model Token Exchange</small></a>
   <div class="site-act">
-    <nav class="site-nav"><a href="#market" data-tab="market" aria-current="page">Exchange</a><a href="#chat" data-tab="chat">Aggregator</a></nav>
+    <nav class="site-nav"><a href="#market" data-tab="market" aria-current="page">Exchange</a><a href="#chat" data-tab="chat">Aggregator</a><a href="#api" data-tab="api">API</a></nav>
     <div class="site-ico"><a class="ico" href="https://x.com/halbrookmarket" target="_blank" rel="noopener" aria-label="Halbrook on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.67l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23Zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64Z"/></svg></a><a class="ico" href="https://github.com/parrotlover01/halbrook" target="_blank" rel="noopener" aria-label="Halbrook on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg></a><a class="ico" href="docs.html" aria-label="Documentation"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8.5 12h7M8.5 15.5h7M8.5 8.5h3"/></svg></a></div>
     <div class="wal"><button class="wal-btn" id="walBtn" aria-expanded="false">Connect wallet</button>
       <div class="wal-pop" id="walPop" hidden><div class="wal-k" id="walK">Connect a wallet</div><button id="walGo" class="wal-real">Browser wallet</button><p id="walMsg">MetaMask, Coinbase Wallet, Rabby or any wallet installed in your browser.</p></div></div>
@@ -625,6 +643,28 @@ html,body{overflow-x:clip}
     </div>
     <div class="chat-log" id="chLog" aria-live="polite"><p class="chat-empty">Pick a model you hold tokens in, then ask anything. Switch models anytime: the conversation follows.</p></div>
     <form class="chat-in" id="chForm"><textarea id="chText" rows="2" placeholder="Ask anything…" aria-label="Message"></textarea><button id="chSend" type="submit">Send</button></form>
+  </div>
+</div></section>
+
+<section id="api" hidden><div class="wrap">
+  <div class="mk-hero"><h1 class="mk-kicker"><img class="mk-bird" src="assets/bureau/mark.png" alt="">API</h1><p class="chat-sub">Every model through one OpenAI-compatible API. Paid from your balance, each request routed to the cheapest host.</p></div>
+  <div class="api-grid">
+    <div class="api-card">
+      <h3>Your keys</h3>
+      <p class="api-p">Keys are shown once, stored only as a fingerprint, and can be revoked in one click. Each request is paid from your tokens of the model you call.</p>
+      <div id="apiKeys"></div>
+      <div class="api-base"><span>Base URL</span><code>https://www.halbrook.xyz/v1</code></div>
+    </div>
+    <div class="api-card">
+      <div class="api-tabs" role="tablist"><button type="button" data-lang="curl" aria-pressed="true">curl</button><button type="button" data-lang="py" aria-pressed="false">Python</button><button type="button" data-lang="js" aria-pressed="false">JavaScript</button></div>
+<pre class="k-code api-code" id="apiCode"></pre>
+      <p class="api-p">Streaming works. Add the header <code>X-Halbrook-Memory: on</code> to give the model your shared memory notes.</p>
+    </div>
+    <div class="api-card api-wide">
+      <h3>Models</h3>
+      <div class="api-models" id="apiModels"></div>
+      <p class="api-p">Limits: 60 requests a minute per key, 4 at a time per account, 5 keys per account. Fee: 5% on top of the real cost.</p>
+    </div>
   </div>
 </div></section>
 
@@ -742,7 +782,7 @@ async function loadMe() {
   const r = await api('/api/me');
   if (r.status === 401) { token = null; try { localStorage.removeItem('hb-token'); } catch (e) {} me = null; }
   else if (r.ok) me = r;
-  renderAcct(); renderChatTop();
+  renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi();
 }
 let flashT = null;
 function flash(t) { const el = $('acctMsg'); if (!el) { if (t) { $('walMsg').textContent = t; $('walPop').hidden = false; } return; } el.textContent = t; clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ''; }, 5000); }
@@ -1073,8 +1113,9 @@ $('ipoRows').innerHTML = IPOS.map(x => {
 
 /* ---------- tabs: Exchange (default) / IPO ---------- */
 function showTab() {
-  const tab = ({ '#ipo': 'ipo', '#chat': 'chat' })[location.hash] || 'market';
-  ['market', 'chat', 'ipo'].forEach(t => { $(t).hidden = t !== tab; });
+  const tab = ({ '#ipo': 'ipo', '#chat': 'chat', '#api': 'api' })[location.hash] || 'market';
+  ['market', 'chat', 'ipo', 'api'].forEach(t => { $(t).hidden = t !== tab; });
+  if (tab === 'api') renderApi();
   document.querySelectorAll('.site-nav a[data-tab]').forEach(a => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   scrollTo(0, 0);
 }
@@ -1144,6 +1185,41 @@ addEventListener('DOMContentLoaded', () => {
   $('funds').addEventListener('click', e => { if (e.target.id === 'funds') $('funds').hidden = true; });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') $('funds').hidden = true; });
 });
+
+/* ---------- API tab ---------- */
+const API_CODE = {
+  curl: `curl https://www.halbrook.xyz/v1/chat/completions \\
+  -H "Authorization: Bearer hb_…" \\
+  -d '{"model":"claude-opus-5.5",
+       "messages":[{"role":"user","content":"Hello"}]}'`,
+  py: `from openai import OpenAI
+
+client = OpenAI(base_url="https://www.halbrook.xyz/v1", api_key="hb_…")
+r = client.chat.completions.create(
+    model="claude-opus-5.5",
+    messages=[{"role": "user", "content": "Hello"}],
+)
+print(r.choices[0].message.content)`,
+  js: `import OpenAI from "openai";
+
+const client = new OpenAI({ baseURL: "https://www.halbrook.xyz/v1", apiKey: "hb_…" });
+const r = await client.chat.completions.create({
+  model: "claude-opus-5.5",
+  messages: [{ role: "user", content: "Hello" }],
+});
+console.log(r.choices[0].message.content);`,
+};
+function renderApi() {
+  const K = $('apiKeys');
+  if (!me) { K.innerHTML = `<button class="acct-b" type="button" id="apiSign">${account ? 'Sign in to create a key' : 'Connect wallet to create a key'}</button>`; $('apiSign').onclick = () => (account ? signIn() : connectWallet().then(x => x && signIn())); }
+  else { K.innerHTML = '<button class="acct-b" type="button" id="apiManage">Create or manage keys</button>'; $('apiManage').onclick = openKeys; }
+  const rows = (cfg && cfg.models || []).map(m => { const x = MK.find(y => y.id === m.id) || {}, id = m.id.split('/')[1];
+    return `<div class="api-m">${brand(x.logo)}<span><b>${esc(m.name)}</b><code>${esc(id)}</code></span><em>${usd(mprice(m.id) || m.blendPerM)} / M</em></div>`; }).join('');
+  $('apiModels').innerHTML = rows || '<p class="api-p">Loading models…</p>';
+}
+function apiLang(l) { document.querySelectorAll('.api-tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === l)); $('apiCode').textContent = API_CODE[l]; }
+document.querySelectorAll('.api-tabs button').forEach(b => b.onclick = () => apiLang(b.dataset.lang));
+apiLang('curl');
 
 /* ---------- API keys ---------- */
 function openKeys() { $('keys').hidden = false; $('kNew').innerHTML = ''; loadKeys(); }
