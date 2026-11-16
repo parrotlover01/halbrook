@@ -72,7 +72,7 @@ ol{padding-left:22px}li{margin:6px 0}
 
   <section>
     <h2>What Halbrook owes, by asset</h2>
-    <p>Every balance is valued at its live market price (reference price plus premium), the most it could be worth if sold now. Totals only: no one's own balance is ever shown.</p>
+    <p>Each asset counts for the most its holders could get out of it right now: selling it all back to USDG (the sale moves the price, as any trade does) or using it at the reference price, whichever is higher. Totals only: no one's own balance is ever shown.</p>
     <table><thead><tr><th>Asset</th><th class="n">Owed (USD)</th></tr></thead><tbody id="rows"><tr><td colspan="2">Loading…</td></tr></tbody></table>
   </section>
 
@@ -80,7 +80,7 @@ ol{padding-left:22px}li{margin:6px 0}
     <h2>How to read it</h2>
     <ol>
       <li><strong>Held</strong> is the USDG balance of the treasury address, read straight from Robinhood Chain.</li>
-      <li><strong>Owed</strong> is the sum of every player's balance at market price, plus withdrawals not yet paid out.</li>
+      <li><strong>Owed</strong> is everything players could take out right now: USDG balances, model tokens at their exit value, and withdrawals not yet paid.</li>
       <li>If held ever falls below owed, withdrawals pause on their own until it is fixed. Balances stay safe while they are paused.</li>
     </ol>
   </section>
@@ -100,7 +100,7 @@ ol{padding-left:22px}li{margin:6px 0}
     $('bar').className = 'bar' + (ok ? '' : ' short'); $('bar').firstElementChild.style.width = Math.min(100, ratio * 100) + '%';
     $('tiles').innerHTML = `
       <div class="tile"><span>Held on chain</span><b>${usd(d.held)}</b><small>USDG in the treasury</small></div>
-      <div class="tile"><span>Owed to players</span><b>${usd(d.owedAtMarket)}</b><small>at market price${d.pendingWithdrawals ? `, incl. ${usd(d.pendingWithdrawals)} in withdrawals` : ''}</small></div>
+      <div class="tile"><span>Owed to players</span><b>${usd(d.owed)}</b><small>what players could take out now${d.pendingWithdrawals ? `, incl. ${usd(d.pendingWithdrawals)} in withdrawals` : ''}</small></div>
       <div class="tile ${d.margin >= 0 ? 'pos' : 'neg'}"><span>${d.margin >= 0 ? 'Surplus' : 'Shortfall'}</span><b>${usd(Math.abs(d.margin))}</b><small>${d.margin >= 0 ? 'more held than owed' : 'withdrawals are paused'}</small></div>`;
     $('addr').innerHTML = `<code>${esc(d.treasury)}</code><a href="${esc(d.explorer)}/address/${esc(d.treasury)}" target="_blank" rel="noopener">View on explorer ↗</a>`;
     $('rows').innerHTML = d.byAsset.length ? d.byAsset.map(a => `<tr><td>${esc(a.name)}</td><td class="n">${usd(a.usd)}</td></tr>`).join('') : '<tr><td colspan="2">No balances yet.</td></tr>';
