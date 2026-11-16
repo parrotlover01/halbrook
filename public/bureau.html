@@ -705,6 +705,31 @@ html,body{overflow-x:clip}
 
 
 
+/* token picker */
+.tx-row select.tp-src{display:none}
+.tx-field{position:relative}
+#swFromIco,#swToIco{display:none}
+.tx-row .tx-u{flex:none}.tx-row input,.tx-row .sw-out{min-width:0}
+.tp-btn{flex:none;display:inline-flex;align-items:center;gap:10px;max-width:62%;padding:8px 14px 8px 8px;border-radius:999px;border:0;cursor:pointer;color:#fff;font:500 15px/1 var(--b);
+  background:linear-gradient(180deg,#1b1b21,#121216);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 0 rgba(0,0,0,.6),0 8px 16px -10px #000}
+.tp-btn span:not(.usd):not(.brand){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tp-btn i{width:9px;height:9px;flex:none;margin-left:2px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-3px);opacity:.6}
+.tp-btn .brand,.tp-btn .usd,.tp-row .brand,.tp-row .usd{width:28px;height:28px;flex:none;border-radius:50%;display:grid;place-items:center}
+.tp-btn .brand img,.tp-row .brand img{width:14px;height:14px}
+.tp-btn .brand,.tp-row .brand{background:radial-gradient(circle at 32% 26%,color-mix(in srgb,var(--c) 68%,#fff 24%),color-mix(in srgb,var(--c) 62%,#0b0b0e) 52%,color-mix(in srgb,var(--c) 32%,#050506) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 2px 0 rgba(0,0,0,.5)}
+.tp-btn .usd,.tp-row .usd{background:linear-gradient(180deg,#2a8a5c,#0e3a27);color:#d9ffe9;font:600 14px/1 var(--b);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 0 rgba(0,0,0,.5)}
+.tp-menu{position:fixed;z-index:200;max-height:min(420px,60vh);overflow:auto;padding:6px;border-radius:16px;
+  background:linear-gradient(180deg,#1a1a20,#121216);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(255,255,255,.08),0 30px 60px -20px #000;animation:tpIn .14s ease-out}
+@keyframes tpIn{from{opacity:0;transform:translateY(-4px)}}
+.tp-head{display:flex;justify-content:space-between;padding:8px 10px 6px;color:var(--muted);font:500 11px/1 var(--m);letter-spacing:.06em;text-transform:uppercase}
+.tp-row{width:100%;display:flex;align-items:center;gap:12px;padding:10px;border:0;border-radius:10px;background:none;color:#fff;cursor:pointer;text-align:left;font:500 14px/1.2 var(--b)}
+.tp-row:hover{background:rgba(255,255,255,.06)}.tp-row.on{background:rgba(239,90,111,.12);box-shadow:inset 0 0 0 1px rgba(239,90,111,.35)}.tp-row.dim{opacity:.55}
+.tp-n{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.tp-n small{color:var(--muted);font:400 11.5px/1 var(--b)}
+.tp-b{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font:500 14px/1 var(--m)}.tp-b small{color:var(--muted);font:400 11.5px/1 var(--m)}
+html[data-theme="light"] .tp-btn{background:linear-gradient(180deg,#fff,#f3f0e9);color:#17161b;box-shadow:inset 0 1px 0 #fff,0 2px 0 rgba(60,45,30,.12),0 6px 12px -8px rgba(60,45,30,.4)}
+html[data-theme="light"] .tp-menu{background:#fff;box-shadow:0 0 0 1px rgba(30,24,20,.1),0 30px 60px -20px rgba(60,45,30,.45)}
+html[data-theme="light"] .tp-row{color:#17161b}html[data-theme="light"] .tp-row:hover{background:rgba(23,22,27,.05)}
+@media (prefers-reduced-motion:reduce){.tp-menu{animation:none}}
 /* ==== light theme (generated) ==== */
 html[data-theme="light"]{--bg:#f4f1ea;--panel:#ffffff;--line:rgba(30,24,20,.1);--line2:rgba(30,24,20,.2);--ink:#17161b;--muted:#6c6876;color-scheme:light}
 html[data-theme="light"] body{background:#f4f1ea;color:#17161b}
@@ -1020,9 +1045,9 @@ html[data-theme="light"] .rh-f{color:#17161b}
     <aside class="tx-card" aria-label="Trade">
       <div id="mkSide" aria-live="polite"></div>
       <div class="tx-swap">
-        <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="number" min="0" step="0.1" value="1" inputmode="decimal" aria-label="Amount in million tokens"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" aria-label="From model"></select></div></div>
+        <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="number" min="0" step="0.1" value="1" inputmode="decimal" aria-label="Amount in million tokens"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" class="tp-src" aria-label="From model"></select><button type="button" class="tp-btn" id="swFromBtn" aria-haspopup="listbox"></button></div></div>
         <button class="sw-flip" id="swFlip" type="button" aria-label="Swap direction">⇅</button>
-        <div class="tx-field"><div class="tx-lab"><label>You get</label><span class="tx-have" id="swHaveTo"></span></div><div class="tx-row"><div class="sw-out" id="swOut">—</div><span class="tx-ico" id="swToIco"></span><select id="swTo" aria-label="To model"></select></div></div>
+        <div class="tx-field"><div class="tx-lab"><label>You get</label><span class="tx-have" id="swHaveTo"></span></div><div class="tx-row"><div class="sw-out" id="swOut">—</div><span class="tx-ico" id="swToIco"></span><select id="swTo" class="tp-src" aria-label="To model"></select><button type="button" class="tp-btn" id="swToBtn" aria-haspopup="listbox"></button></div></div>
         <div class="sw-rate" id="swRate">—</div>
         <button class="sw-go" id="swGo" type="button">Swap</button>
         <p class="sw-note" id="swNote">Market price · 0.3% fee · your swap moves the premium</p>
@@ -1390,9 +1415,47 @@ function fillSelects() {
   ['swFrom', 'swTo'].forEach(i => { const v = $(i).value; $(i).innerHTML = opts; if (v) $(i).value = v; });
   if (!$('swFrom').value || $('swFrom').value === $('swTo').value) { $('swFrom').value = 'mistralai/mistral-large-4-0'; $('swTo').value = 'anthropic/claude-opus-5.5'; }
 }
+/* token picker: every asset with its logo and what you hold of it, USDG first */
+const tpIco = id => id === 'usdg' ? '<span class="usd">$</span>' : brand((MK.find(x => x.id === id) || {}).logo);
+const tpName = id => id === 'usdg' ? 'USDG' : (mk[id] ? mk[id].name : id);
+function tpHeld(id) {
+  if (!me) return { t: '', u: '' };
+  const b = me.balances.find(y => y.model === id);
+  if (id === 'usdg') return { t: '$' + ((b ? b.tokens : 0) / 1e6).toFixed(2), u: walUsdg > 0 ? `+ ${walUsdg.toFixed(2)} in wallet` : '' };
+  return b ? { t: fmtTok(b.tokens), u: '$' + (b.usd || 0).toFixed(2) } : { t: '0', u: '' };
+}
+function renderPickers() {
+  [['swFrom', 'swFromBtn'], ['swTo', 'swToBtn']].forEach(([s, b]) => { const v = $(s).value; $(b).innerHTML = `${tpIco(v)}<span>${esc(tpName(v))}</span><i aria-hidden="true"></i>`; });
+}
+let tpOpen = null;
+function closePicker() { if (tpOpen) { tpOpen.remove(); tpOpen = null; } }
+function openPicker(selId, btn) {
+  if (tpOpen && tpOpen.dataset.for === selId) return closePicker();
+  closePicker();
+  const ids = ['usdg', ...MK.filter(x => mk[x.id]).map(x => x.id)], cur = $(selId).value, other = $(selId === 'swFrom' ? 'swTo' : 'swFrom').value;
+  const m = document.createElement('div'); m.className = 'tp-menu'; m.dataset.for = selId; m.setAttribute('role', 'listbox');
+  m.innerHTML = `<div class="tp-head"><span>Asset</span><span>${me ? 'Your balance' : 'Sign in to see balances'}</span></div>` + ids.map(id => { const h = tpHeld(id);
+    return `<button type="button" role="option" class="tp-row${id === cur ? ' on' : ''}${id === other ? ' dim' : ''}" data-v="${esc(id)}" aria-selected="${id === cur}">${tpIco(id)}<span class="tp-n">${esc(tpName(id))}${id === 'usdg' ? '<small>Dollars</small>' : ''}</span><span class="tp-b"><b>${esc(h.t)}</b><small>${esc(h.u)}</small></span></button>`; }).join('');
+  document.body.appendChild(m); tpOpen = m;
+  // float above everything, under the button (or above it when there is no room below)
+  const r = btn.getBoundingClientRect(), h = m.offsetHeight, below = innerHeight - r.bottom - 12;
+  const vw = document.documentElement.clientWidth, w = Math.min(360, vw - 16); m.style.width = w + 'px';
+  m.style.left = Math.max(8, Math.min(r.right - w, vw - w - 8)) + 'px';
+  m.style.top = (below >= h || below >= r.top ? r.bottom + 8 : Math.max(8, r.top - h - 8)) + 'px';
+  m.querySelectorAll('.tp-row').forEach(r => r.onclick = e => { e.stopPropagation(); const v = r.dataset.v, o = selId === 'swFrom' ? 'swTo' : 'swFrom';
+    if (v === $(o).value) $(o).value = $(selId).value;   // picking the other side's asset flips the pair
+    $(selId).value = v; $(selId).dispatchEvent(new Event('change')); closePicker(); renderSwap(); });
+  const on = m.querySelector('.tp-row.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+}
+$('swFromBtn').onclick = e => { e.stopPropagation(); openPicker('swFrom', e.currentTarget); };
+$('swToBtn').onclick = e => { e.stopPropagation(); openPicker('swTo', e.currentTarget); };
+document.addEventListener('click', e => { if (tpOpen && !tpOpen.contains(e.target)) closePicker(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+addEventListener('scroll', e => { if (tpOpen && !tpOpen.contains(e.target)) closePicker(); }, true); addEventListener('resize', closePicker);
 const fmtM = v => v >= 1 ? v.toFixed(v >= 100 ? 0 : 3) + 'M' : (v * 1000).toFixed(v * 1000 >= 100 ? 0 : 1) + 'K';
 let quoteT = null, quoteN = 0;
 function renderSwap() {
+  if (typeof renderPickers === 'function') renderPickers();
   if (!$('swFrom').options.length) fillSelects();
   const a = $('swFrom').value, b = $('swTo').value, amt = Math.max(0, +$('swAmt').value || 0);
   const U = { name: 'USDG' }, f = a === 'usdg' ? U : mk[a], t = b === 'usdg' ? U : mk[b]; if (!f || !t) return;
