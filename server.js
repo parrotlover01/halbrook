@@ -37,7 +37,8 @@ let liveReady = false;
 const BAND = 0.30;                                                       // premium stays within -30% .. +30%
 const DEPTH_USD = Number(process.env.MARKET_DEPTH_USD || 10);           // USD of net flow that moves a premium by 10 points
 const HALF_LIFE_H = Number(process.env.MARKET_HALF_LIFE_H || 0);        // 0 = premiums never fade on their own: a pure player-vs-player market
-const WD_FEE = Number(process.env.WITHDRAW_FEE_USD || 0.5);             // flat fee per withdrawal, covers gas
+const WD_FEE = Number(process.env.WITHDRAW_FEE_USD || 0.5);
+const API_ON = process.env.API_ENABLED === '1';                          // the public API (/v1 and API keys) is off until a later update             // flat fee per withdrawal, covers gas
 
 const db = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, max: 5 }) : null;
 
@@ -608,6 +609,7 @@ async function api(req, res, p) {
       const { rows } = await db.query('SELECT id, prefix, label, created, last_used, spent FROM api_keys WHERE address = $1 AND NOT revoked ORDER BY created DESC', [user]);
       return send(res, 200, { keys: rows.map(k => ({ id: String(k.id), prefix: k.prefix, label: k.label, created: k.created, lastUsed: k.last_used, spent: Number(k.spent) })) });
     }
+    if (p === '/api/keys' && req.method === 'POST' && !API_ON) return send(res, 403, { error: 'API keys are coming soon' });
     if (p === '/api/keys' && req.method === 'POST') {
       if (throttled('key:' + user, 2000)) return send(res, 429, { error: 'Slow down a little' });
       const { label } = await readJSON(req);
@@ -639,6 +641,7 @@ const ROLES = new Set(['system', 'developer', 'user', 'assistant', 'tool']);
 const inflight = new Map();
 async function v1(req, res, p) {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS).end(); return; }
+  if (!API_ON) return oaErr(res, 503, 'The Halbrook API is coming soon.', 'server_error');
   if (!db) return oaErr(res, 503, 'Service unavailable', 'server_error');
   try {
     if (p === '/v1/models' && req.method === 'GET') {
