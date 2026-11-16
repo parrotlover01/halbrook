@@ -1473,7 +1473,7 @@ function renderSwap() {
     const hf = own(a), ht = own(b);
     $('swHave').innerHTML = `Balance: <b>${fmtHave(a, hf)}</b>` + (hf ? ' <button type="button" class="tx-max">Max</button>' : '');
     $('swHaveTo').innerHTML = `Balance: <b>${fmtHave(b, ht)}</b>`;
-    if (a === 'usdg' && walUsdg >= 1) $('swHave').innerHTML += ` <span class="sw-wal">· wallet ${walUsdg.toFixed(2)} USDG, <a href="#" class="sw-dep">deposit to trade</a></span>`;
+    if (a === 'usdg' && walUsdg >= 1) $('swHave').innerHTML += ` <span class="sw-wal">In wallet: ${walUsdg.toFixed(2)} USDG · <a href="#" class="sw-dep">deposit</a></span>`;
     const sd = $('swHave').querySelector('.sw-dep'); if (sd) sd.onclick = e => { e.preventDefault(); openFunds('dep'); };
     const mx = $('swHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('swAmt').value = String(Math.floor(hf / 1e4) / 100); renderSwap(); };
   } else { $('swHave').textContent = ''; $('swHaveTo').textContent = ''; }
