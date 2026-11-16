@@ -1223,9 +1223,11 @@ function flash(t) { const el = $('acctMsg'); if (!el) { if (t) { $('walMsg').tex
 function renderAcct() {
   const el = $('acct'); if (!el) return;
   updWal();
-  el.hidden = !(cfg && account && me);
+  el.hidden = !(cfg && account);
   if (el.hidden) { el.innerHTML = ''; return; }
-  {
+  // wallet connected but not signed in yet (or just switched wallet): ask for the signature right here
+  if (!me) el.innerHTML = `<div class="acct-tot"><span>Your balance</span><b>—</b></div><button class="acct-b acct-dep" id="acctGo" type="button">Sign in with ${esc(short(account))}</button><span class="acct-msg" id="acctMsg">Sign a message to see your balance. No fee.</span>`;
+  else {
     const total = me.balances.reduce((a, b) => a + (b.usd || 0), 0);
     el.innerHTML = `<div class="acct-tot"><span>Your balance</span><b>$${total.toFixed(2)}</b></div>
       <div class="acct-chips">${me.balances.length ? me.balances.map(b => b.model === 'usdg' ? `<span class="chip-b chip-usd">USDG <b>$${(b.tokens / 1e6).toFixed(2)}</b></span>` : `<span class="chip-b">${esc(nameOf(b.model))} <b>${fmtTok(b.tokens)}</b></span>`).join('') : '<span class="acct-t">No tokens yet.</span>'}</div>
