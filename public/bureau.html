@@ -1178,7 +1178,7 @@ async function connectWallet() {
   try { const [a] = await eth.request({ method: 'eth_requestAccounts' }); setAccount(a); $('walPop').hidden = true; return a; }
   catch (e) { $('walMsg').textContent = 'Connection cancelled.'; return null; }
 }
-function updWal() { $('walBtn').textContent = !account ? 'Connect wallet' : (me || !cfg) ? short(account) : 'Sign in';
+function updWal() { $('walBtn').textContent = !account ? 'Connect wallet' : (me || !cfg) ? short(account) : 'Connect wallet';
   // signed in: your total balance sits in the header, one click away from withdrawing
   const hb = $('hdrBal'); hb.hidden = !me;
   if (me) $('hdrBalV').textContent = '$' + me.balances.reduce((a, x) => a + (x.usd || 0), 0).toFixed(2); }
