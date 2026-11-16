@@ -1186,7 +1186,11 @@ async function loadMe() {
   if (!token) { me = null; renderAcct(); return; }
   const r = await api('/api/me');
   if (r.status === 401) { token = null; try { localStorage.removeItem('hb-token'); } catch (e) {} me = null; }
-  else if (r.ok) { me = r; loadWallet(); }
+  else if (r.ok) {
+    // signed in as another wallet than the one now connected (e.g. switched account in MetaMask): that session is not this wallet's
+    if (account && r.address && r.address.toLowerCase() !== account.toLowerCase()) { token = null; try { localStorage.removeItem('hb-token'); } catch (e) {} me = null; }
+    else { me = r; loadWallet(); }
+  }
   renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi();
 }
 let flashT = null;
