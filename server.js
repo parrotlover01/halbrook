@@ -725,8 +725,14 @@ const SEC = { 'Content-Security-Policy': CSP, 'X-Content-Type-Options': 'nosniff
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()', 'Cross-Origin-Opener-Policy': 'same-origin-allow-popups' };
 const GZIP = /^(text\/|image\/svg)/;
 const ROOT_DIR = ROOT + path.sep;
+const CLEAN_URLS = { '/app': '/bureau.html', '/docs': '/docs.html', '/reserves': '/reserves.html', '/admin': '/admin.html' };
+const OLD_URLS = { '/bureau.html': '/app', '/docs.html': '/docs', '/reserves.html': '/reserves', '/admin.html': '/admin', '/index.html': '/' };
 function serve(req, res, p) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
+  // clean addresses: /app, /docs, /reserves, /admin. The old .html ones redirect for good, so shared links keep working.
+  const old = OLD_URLS[p] || (p !== '/' && p.endsWith('/') && CLEAN_URLS[p.slice(0, -1)] ? p.slice(0, -1) : null);
+  if (old) { const q = req.url.indexOf('?'); res.writeHead(301, { Location: old + (q >= 0 ? req.url.slice(q) : ''), 'Cache-Control': 'public, max-age=86400' }).end(); return; }
+  if (CLEAN_URLS[p]) p = CLEAN_URLS[p];
   if (p.endsWith('/')) p += 'index.html';
   const file = path.normalize(path.join(ROOT, p));
   if (!file.startsWith(ROOT_DIR) || p.split('/').some(s => s.startsWith('.')) || file.includes('\0')) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found'); return; }
