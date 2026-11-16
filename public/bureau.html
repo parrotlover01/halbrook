@@ -1229,7 +1229,7 @@ function renderAcct() {
     const total = me.balances.reduce((a, b) => a + (b.usd || 0), 0);
     el.innerHTML = `<div class="acct-tot"><span>Your balance</span><b>$${total.toFixed(2)}</b></div>
       <div class="acct-chips">${me.balances.length ? me.balances.map(b => b.model === 'usdg' ? `<span class="chip-b chip-usd">USDG <b>$${(b.tokens / 1e6).toFixed(2)}</b></span>` : `<span class="chip-b">${esc(nameOf(b.model))} <b>${fmtTok(b.tokens)}</b></span>`).join('') : '<span class="acct-t">No tokens yet.</span>'}</div>
-      <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button><button class="acct-b acct-ghost" id="acctKeys" type="button">API key</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? 'USDG on Robinhood Chain' : 'Test mode · real USDG at launch'}</span>`;
+      <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button><button class="acct-b acct-ghost" id="acctKeys" type="button">API key</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? '' : 'Test mode · real USDG at launch'}</span>`;
   }
   const go = $('acctGo'); if (go) go.onclick = () => (account ? signIn() : connectWallet().then(a => a && signIn()));
   const kb = $('acctKeys'); if (kb) kb.onclick = openKeys;
