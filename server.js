@@ -72,8 +72,10 @@ async function migrate() {
 async function voidSelfDeposits() {
   OWN.add(TREASURY.toLowerCase());
   if (WD_ON) { try { OWN.add(hot().wallet.account.address.toLowerCase()); } catch {} }
-  const { rows } = await db.query("SELECT tx_hash, log_index, address, amount FROM deposits d WHERE lower(address) = ANY($1) AND NOT EXISTS (SELECT 1 FROM ledger WHERE kind = 'deposit-void' AND meta->>'tx' = d.tx_hash AND meta->>'log' = d.log_index::text)", [[...OWN]]);
+  const { rows } = await db.query("SELECT tx_hash, log_index, address, amount FROM deposits d WHERE NOT EXISTS (SELECT 1 FROM ledger WHERE kind = 'deposit-void' AND meta->>'tx' = d.tx_hash AND meta->>'log' = d.log_index::text)", [[...OWN]]);
   for (const d of rows) {
+    const origin = OWN.has(d.address.toLowerCase()) ? d.address : await txFrom(d.tx_hash).catch(() => null);
+    if (!origin || !OWN.has(origin.toLowerCase())) continue;
     const c = await db.connect();
     try {
       await c.query('BEGIN');
@@ -249,6 +251,10 @@ const TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
 const topicOf = a => '0x' + a.toLowerCase().slice(2).padStart(64, '0');
 let scanning = false;
 const OWN = new Set();   // the treasury and hot wallet addresses, filled at start
+const txFromCache = new Map();
+async function txFrom(hash) { if (!txFromCache.has(hash)) { const t = await rpc('eth_getTransactionByHash', [hash]); txFromCache.set(hash, t && t.from ? getAddress(t.from) : null); } return txFromCache.get(hash); }
+const codeCache = new Map();
+async function isContract(a) { if (!codeCache.has(a)) codeCache.set(a, ((await rpc('eth_getCode', [a, 'latest'])) || '0x').length > 2); return codeCache.get(a); }
 // credits each USDG transfer to the treasury to the wallet that sent it, once, after CONFIRMATIONS blocks
 async function scanDeposits() {
   if (!liveReady || scanning) return; scanning = true;
@@ -263,8 +269,11 @@ async function scanDeposits() {
         await c.query('BEGIN');
         for (const l of logs) {
           if (l.removed || l.address.toLowerCase() !== USDG_CONTRACT.toLowerCase()) continue;
-          const sender = getAddress('0x' + l.topics[1].slice(26)), amount = BigInt(l.data).toString();
+          let sender = getAddress('0x' + l.topics[1].slice(26)); const amount = BigInt(l.data).toString();
           if (amount === '0' || OWN.has(sender.toLowerCase())) continue;   // the treasury paying itself is not a deposit
+          const origin = await txFrom(l.transactionHash);
+          if (origin && OWN.has(origin.toLowerCase())) continue;           // the treasury buying USDG through a router: not a deposit either
+          if (origin && await isContract(sender)) sender = origin;         // sent through a contract (router, bridge): credit the wallet that signed
           const ins = await c.query('INSERT INTO deposits (tx_hash, log_index, address, amount, block) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [l.transactionHash, parseInt(l.logIndex, 16), sender, amount, parseInt(l.blockNumber, 16)]);
           if (!ins.rowCount) continue;
           await c.query('INSERT INTO users (address) VALUES ($1) ON CONFLICT DO NOTHING', [sender]);
@@ -486,6 +495,11 @@ async function api(req, res, p) {
       } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
     }
 
+    if (p === '/api/wallet' && req.method === 'GET') {
+      if (overLimit('wallet:' + user, 30, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      const raw = await rpc('eth_call', [{ to: USDG_CONTRACT, data: '0x70a08231' + user.slice(2).toLowerCase().padStart(64, '0') }, 'latest']);
+      return send(res, 200, { address: user, usdg: Number(BigInt(raw)) / 1e6 });
+    }
     if (p === '/api/me' && req.method === 'GET') {
       const { rows } = await db.query("SELECT 1 FROM ledger WHERE address = $1 AND kind = 'faucet' LIMIT 1", [user]);
       return send(res, 200, { address: user, balances: await balances(user), faucetUsed: rows.length > 0 });

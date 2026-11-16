@@ -667,6 +667,8 @@ footer a{color:var(--muted)}
 @media (max-width:640px){.ch-sugg{grid-template-columns:1fr}.msg{max-width:96%}.ch-hint{display:none}}
 @media (prefers-reduced-motion:reduce){.ch-orb .brand,.dots i{animation:none}}
 .theme-b{background:none;border:0;cursor:pointer;padding:0}.theme-b .i-moon{display:none}html[data-theme="light"] .theme-b .i-moon{display:block}html[data-theme="light"] .theme-b .i-sun{display:none}
+.fd-in{position:relative;flex:1;display:flex}.fd-in input{flex:1;padding-right:64px}.fd-in .tx-max{position:absolute;right:10px;top:50%;transform:translateY(-50%);margin:0}
+.sw-wal{color:var(--muted)}.sw-wal a{color:inherit;text-decoration:underline}
 /* tidy */
 .mk{align-items:start}
 .sw-in span{white-space:nowrap}
@@ -1184,7 +1186,7 @@ async function loadMe() {
   if (!token) { me = null; renderAcct(); return; }
   const r = await api('/api/me');
   if (r.status === 401) { token = null; try { localStorage.removeItem('hb-token'); } catch (e) {} me = null; }
-  else if (r.ok) me = r;
+  else if (r.ok) { me = r; loadWallet(); }
   renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi();
 }
 let flashT = null;
@@ -1402,6 +1404,8 @@ function renderSwap() {
     const hf = own(a), ht = own(b);
     $('swHave').innerHTML = `Balance: <b>${fmtHave(a, hf)}</b>` + (hf ? ' <button type="button" class="tx-max">Max</button>' : '');
     $('swHaveTo').innerHTML = `Balance: <b>${fmtHave(b, ht)}</b>`;
+    if (a === 'usdg' && walUsdg > 0) $('swHave').innerHTML += ` <span class="sw-wal">· wallet ${walUsdg.toFixed(2)} USDG, <a href="#" class="sw-dep">deposit to trade</a></span>`;
+    const sd = $('swHave').querySelector('.sw-dep'); if (sd) sd.onclick = e => { e.preventDefault(); openFunds('dep'); };
     const mx = $('swHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('swAmt').value = String(Math.floor(hf / 1e4) / 100); renderSwap(); };
   } else { $('swHave').textContent = ''; $('swHaveTo').textContent = ''; }
   $('swOut').textContent = show(b, out * 1e6);
@@ -1583,7 +1587,8 @@ async function openFunds(tab) {
     <h3>Deposit USDG</h3>
     <p>Send USDG on <b>${esc(F.chainName)}</b> from the wallet you are signed in with. It is credited to your balance after ${F.confirmations} confirmations, usually under a minute.</p>
     <div class="fd-addr"><span>Deposit address</span><code>${esc(F.address)}</code><button class="acct-b" type="button" id="fdCopy">Copy</button></div>
-    <div class="fd-send"><input id="fdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button class="sw-go" type="button" id="fdSend">Send from my wallet</button></div>
+    <div class="fd-avail"><span>In your wallet</span><b id="fdWal">…</b></div>
+    <div class="fd-send"><div class="fd-in"><input id="fdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button type="button" class="tx-max" id="fdMax">Max</button></div><button class="sw-go" type="button" id="fdSend">Send from my wallet</button></div>
     <p class="fd-warn">Only USDG, only on ${esc(F.chainName)}, only from your connected wallet. Anything else cannot be credited.</p>
     <p class="fd-get">No USDG yet? It is the Global Dollar by Paxos: <a href="https://globaldollar.com" target="_blank" rel="noopener">see where to get it ↗</a></p>`
     : `<h3>Deposit USDG</h3><p>Real deposits open at launch: USDG on Robinhood Chain, credited in under a minute. During the test, use the free test credit in your balance.</p><p class="fd-get">USDG is the Global Dollar by Paxos: <a href="https://globaldollar.com" target="_blank" rel="noopener">see where to get it ↗</a></p>`;
@@ -1593,11 +1598,14 @@ async function openFunds(tab) {
     <p>${wdOpen ? `Withdrawals go to your connected wallet ${me ? `<code>${esc(short(me.address))}</code>` : ''}. Swap tokens to USDG first.` : 'Withdrawals open at launch. Swap tokens to USDG, then withdraw them to your wallet.'}</p>
     <div class="fd-avail"><span>Available</span><b>$${usdgBal().toFixed(2)}</b></div>
     ${wdOpen && !usdgBal() ? `<p class="fd-empty">Nothing to withdraw yet. Withdrawals are paid in USDG: on the Exchange, swap your tokens with "You get: USDG", then come back here.</p>` : ''}
-    ${wdOpen && usdgBal() ? `<div class="fd-send"><input id="fdWdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button class="sw-go" type="button" id="fdWdGo">Withdraw</button></div>
+    ${wdOpen && usdgBal() ? `<div class="fd-send"><div class="fd-in"><input id="fdWdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button type="button" class="tx-max" id="fdWdMax">Max</button></div><button class="sw-go" type="button" id="fdWdGo">Withdraw</button></div>
     <p class="fd-warn">Fee ${(F.wdFee || 0).toFixed(2)} USDG per withdrawal. Up to ${F.wdMax} USDG per withdrawal and ${F.wdDaily} per day. Above ${F.wdAuto} USDG, a person checks it first.</p>` : ''}`;
   if ($('fdCopy')) $('fdCopy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(F.address).then(() => { $('fdCopy').textContent = 'Copied'; });
   if ($('fdSend')) $('fdSend').onclick = sendDeposit;
   if ($('fdWdGo')) $('fdWdGo').onclick = doWithdraw;
+  if ($('fdWdMax')) $('fdWdMax').onclick = () => { $('fdWdAmt').value = String(Math.floor(usdgBal() * 100) / 100); };
+  if ($('fdMax')) $('fdMax').onclick = () => { if (walUsdg != null) $('fdAmt').value = String(Math.floor(walUsdg * 100) / 100); };
+  if ($('fdWal')) loadWallet().then(() => { $('fdWal').textContent = walUsdg == null ? (me ? '—' : 'Sign in to see it') : walUsdg.toFixed(2) + ' USDG'; });
   loadHist();
 }
 async function loadHist() {
@@ -1606,6 +1614,8 @@ async function loadHist() {
   const rows = [...r.deposits.map(d => ({ k: 'Deposit', usdg: d.usdg, st: 'credited', tx: d.tx, ts: d.ts })), ...r.withdrawals.map(w => ({ k: 'Withdrawal', usdg: w.usdg, st: { queued: 'sending soon', review: 'being checked', sending: 'sending', sent: 'confirming', done: 'sent', failed: 'failed, refunded', rejected: 'refused, refunded' }[w.status] || w.status, tx: w.tx, ts: w.ts }))].sort((x, y) => new Date(y.ts) - new Date(x.ts)).slice(0, 8);
   $('fdHist').innerHTML = rows.length ? '<div class="k-cap">History</div>' + rows.map(x => `<div class="fd-row"><span>${x.k}</span><b>$${x.usdg.toFixed(2)}</b><small>${esc(x.st)}</small>${shortTx(x.tx)}</div>`).join('') : '';
 }
+let walUsdg = null;   // USDG in the signed-in wallet itself, on chain (not yet deposited)
+async function loadWallet() { if (!me) { walUsdg = null; return; } try { const r = await api('/api/wallet'); walUsdg = typeof r.usdg === 'number' ? r.usdg : null; } catch (e) { walUsdg = null; } renderSwap && renderSwap(); }
 async function sendDeposit() {
   const F = FD(), v = Math.round((+$('fdAmt').value || 0) * 1e6), msg = t => { $('fdSend').textContent = t; };
   if (!(v >= 1e6)) return msg('At least 1 USDG');
