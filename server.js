@@ -454,6 +454,7 @@ async function api(req, res, p) {
     }
 
     if (p.startsWith('/api/admin/')) {
+      if (overLimit('admin:' + ipOf(req), 30, 60_000)) return send(res, 429, { error: 'Slow down a little' });
       const h = req.headers.authorization || '', t = Buffer.from(h.startsWith('Bearer ') ? h.slice(7) : ''), k = Buffer.from(ADMIN_TOKEN);
       if (ADMIN_TOKEN.length < 24 || t.length !== k.length || !crypto.timingSafeEqual(t, k)) return send(res, 401, { error: 'Not allowed' });
       if (p === '/api/admin/solvency' && req.method === 'GET') return send(res, 200, await solvency(true));
