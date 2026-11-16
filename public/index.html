@@ -85,6 +85,8 @@ body{font-family:var(--f-body);font-size:15px;line-height:1.5;user-select:none;-
 .dial button{background:none;border:0;color:var(--brass);font-size:14px;cursor:pointer;padding:3px 12px}
 .dial output{font:600 24px/1 var(--f-mono);color:#0c0a06;background:linear-gradient(#efd69c,#b08940);width:36px;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums}
 .dial output.cur{box-shadow:0 0 0 2px var(--steel)}
+.dial button,.dial output{touch-action:manipulation;-webkit-user-select:none;user-select:none}.dial output{cursor:ns-resize}
+@media (pointer:coarse){.dials{gap:8px;padding:10px}.dial button{font-size:18px;padding:12px 16px;min-height:44px}.dial output{width:52px;font-size:32px;padding:12px 0;touch-action:none}}
 .card{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px max(16px,env(safe-area-inset-left,0px));background:rgba(0,0,0,.86);z-index:6}
 .endc{gap:22px}
 .endc .enter{text-decoration:none;background:#fff;color:#000;border-color:#fff;font:500 15px/1 var(--f-body);letter-spacing:.02em;text-transform:none;padding:16px 34px;border-radius:2px}
@@ -326,13 +328,20 @@ function tick() { minutes++; }
 let digits = [0, 0, 0, 0], di = 0;
 function lockUI() {
   return new Promise(res => {
-    digits = [0, 0, 0, 0]; di = 0; show('N', 'Four brass dials. Type the numbers or turn them.'); $('choices').innerHTML = ''; lockActive = true;
+    digits = [0, 0, 0, 0]; di = 0; show('N', matchMedia('(pointer: coarse)').matches ? 'Four brass dials. Tap or swipe each one to turn it.' : 'Four brass dials. Type the numbers or turn them.'); $('choices').innerHTML = ''; lockActive = true;
     const dials = document.createElement('div'); dials.className = 'dials';
     digits.forEach((_, i) => { const col = document.createElement('div'); col.className = 'dial';
       const up = document.createElement('button'); up.textContent = '▲'; up.setAttribute('aria-label', 'Increase digit ' + (i + 1));
       const out = document.createElement('output'); out.id = 'dg' + i; out.textContent = '0';
       const dn = document.createElement('button'); dn.textContent = '▼'; dn.setAttribute('aria-label', 'Decrease digit ' + (i + 1));
       up.onclick = () => { digits[i] = (digits[i] + 1) % 10; renderDials(); }; dn.onclick = () => { digits[i] = (digits[i] + 9) % 10; renderDials(); };
+      // touch: a tap turns the dial up, a swipe turns it up or down one step per 24 px
+      let y0 = null, moved = 0;
+      out.addEventListener('pointerdown', e => { y0 = e.clientY; moved = 0; di = i; out.setPointerCapture && out.setPointerCapture(e.pointerId); renderDials(); });
+      out.addEventListener('pointermove', e => { if (y0 == null) return; const st = Math.trunc((y0 - e.clientY) / 24);
+        if (st) { digits[i] = (digits[i] + st + 100) % 10; y0 -= st * 24; moved++; renderDials(); } });
+      out.addEventListener('pointerup', () => { if (y0 != null && !moved) { digits[i] = (digits[i] + 1) % 10; renderDials(); } y0 = null; });
+      out.addEventListener('pointercancel', () => { y0 = null; });
       col.append(up, out, dn); dials.appendChild(col); });
     $('choices').appendChild(dials);
     btn('Open', () => { lockActive = false; tick(); res(digits.join('')); }, 'cont');
