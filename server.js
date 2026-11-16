@@ -170,8 +170,9 @@ function throttled(key, ms) { const t = Date.now(), p = lastHit.get(key) || 0; i
 const counts = new Map();
 function overLimit(key, max, ms) { const t = Date.now(), c = counts.get(key); if (!c || c.reset < t) { counts.set(key, { n: 1, reset: t + ms }); return false; } c.n++; return c.n > max; }
 setInterval(() => { const t = Date.now(); for (const [k, v] of lastHit) if (t - v > 60_000) lastHit.delete(k); for (const [k, v] of counts) if (v.reset < t) counts.delete(k); }, 60_000).unref();
-// client IP: Railway's proxy appends the real address last in X-Forwarded-For
-const ipOf = req => { const x = String(req.headers['x-forwarded-for'] || '').split(',').map(s => s.trim()).filter(Boolean); return x[x.length - 1] || req.socket.remoteAddress || '?'; };
+// client IP: Railway's edge sets X-Real-IP to the caller and overwrites any X-Forwarded-For the caller sends;
+// the last X-Forwarded-For entry is an edge node that changes from request to request, so it must not be used.
+const ipOf = req => String(req.headers['x-real-ip'] || '').trim() || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
 // only real model ids, never inherited object keys like "constructor"
 const priceOf = id => (typeof id === 'string' && MODELS.includes(id) && Object.hasOwn(PRICES, id)) ? PRICES[id] : null;
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
