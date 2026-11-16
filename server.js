@@ -67,7 +67,22 @@ async function migrate() {
   await db.query('DELETE FROM balances WHERE NOT (model = ANY($1))', [[...MODELS, USDG]]);
   await db.query("ALTER TABLE balances ADD CONSTRAINT balances_sane CHECK (amount >= 0 AND amount <> 'NaN')").catch(() => {});
   await db.query('INSERT INTO market (model) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING', [MODELS]);
-  if (LIVE) await goLive();
+  if (LIVE) { await goLive(); await voidSelfDeposits(); }
+}
+async function voidSelfDeposits() {
+  OWN.add(TREASURY.toLowerCase());
+  if (WD_ON) { try { OWN.add(hot().wallet.account.address.toLowerCase()); } catch {} }
+  const { rows } = await db.query("SELECT tx_hash, log_index, address, amount FROM deposits d WHERE lower(address) = ANY($1) AND NOT EXISTS (SELECT 1 FROM ledger WHERE kind = 'deposit-void' AND meta->>'tx' = d.tx_hash AND meta->>'log' = d.log_index::text)", [[...OWN]]);
+  for (const d of rows) {
+    const c = await db.connect();
+    try {
+      await c.query('BEGIN');
+      await c.query('UPDATE balances SET amount = GREATEST(amount - $3, 0) WHERE address = $1 AND model = $2', [d.address, USDG, d.amount]);
+      await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'deposit-void',$2,$3,$4)", [d.address, USDG, '-' + d.amount, JSON.stringify({ tx: d.tx_hash, log: String(d.log_index), why: 'treasury sent to itself' })]);
+      await c.query('COMMIT');
+      console.log('voided self-deposit', d.tx_hash, Number(d.amount) / 1e6, 'USDG');
+    } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+  }
 }
 // first start with real money: every balance and premium so far was test money, so it all goes back to zero,
 // and deposits are counted from this block on. Runs once.
@@ -233,6 +248,7 @@ async function rpc(method, params) {
 const TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const topicOf = a => '0x' + a.toLowerCase().slice(2).padStart(64, '0');
 let scanning = false;
+const OWN = new Set();   // the treasury and hot wallet addresses, filled at start
 // credits each USDG transfer to the treasury to the wallet that sent it, once, after CONFIRMATIONS blocks
 async function scanDeposits() {
   if (!liveReady || scanning) return; scanning = true;
@@ -248,7 +264,7 @@ async function scanDeposits() {
         for (const l of logs) {
           if (l.removed || l.address.toLowerCase() !== USDG_CONTRACT.toLowerCase()) continue;
           const sender = getAddress('0x' + l.topics[1].slice(26)), amount = BigInt(l.data).toString();
-          if (amount === '0') continue;
+          if (amount === '0' || OWN.has(sender.toLowerCase())) continue;   // the treasury paying itself is not a deposit
           const ins = await c.query('INSERT INTO deposits (tx_hash, log_index, address, amount, block) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [l.transactionHash, parseInt(l.logIndex, 16), sender, amount, parseInt(l.blockNumber, 16)]);
           if (!ins.rowCount) continue;
           await c.query('INSERT INTO users (address) VALUES ($1) ON CONFLICT DO NOTHING', [sender]);
