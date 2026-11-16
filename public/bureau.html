@@ -668,7 +668,7 @@ footer a{color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.ch-orb .brand,.dots i{animation:none}}
 .theme-b{background:none;border:0;cursor:pointer;padding:0}.theme-b .i-moon{display:none}html[data-theme="light"] .theme-b .i-moon{display:block}html[data-theme="light"] .theme-b .i-sun{display:none}
 .fd-in{position:relative;flex:1;display:flex}.fd-in input{flex:1;padding-right:64px}.fd-in .tx-max{position:absolute;right:10px;top:50%;transform:translateY(-50%);margin:0}
-.sw-wal{color:var(--muted)}.sw-wal a{color:inherit;text-decoration:underline}
+.tx-lab{flex-wrap:wrap;row-gap:6px}.tx-lab label{white-space:nowrap}.tx-have{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:6px 4px;min-width:0}.tx-have .tx-max{margin-left:4px}.sw-wal{flex-basis:100%;text-align:right;color:var(--muted);white-space:normal}.sw-wal a{color:inherit;text-decoration:underline}
 /* tidy */
 .mk{align-items:start}
 .sw-in span{white-space:nowrap}
@@ -1473,7 +1473,7 @@ function renderSwap() {
     const hf = own(a), ht = own(b);
     $('swHave').innerHTML = `Balance: <b>${fmtHave(a, hf)}</b>` + (hf ? ' <button type="button" class="tx-max">Max</button>' : '');
     $('swHaveTo').innerHTML = `Balance: <b>${fmtHave(b, ht)}</b>`;
-    if (a === 'usdg' && walUsdg > 0) $('swHave').innerHTML += ` <span class="sw-wal">· wallet ${walUsdg.toFixed(2)} USDG, <a href="#" class="sw-dep">deposit to trade</a></span>`;
+    if (a === 'usdg' && walUsdg >= 1) $('swHave').innerHTML += ` <span class="sw-wal">· wallet ${walUsdg.toFixed(2)} USDG, <a href="#" class="sw-dep">deposit to trade</a></span>`;
     const sd = $('swHave').querySelector('.sw-dep'); if (sd) sd.onclick = e => { e.preventDefault(); openFunds('dep'); };
     const mx = $('swHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('swAmt').value = String(Math.floor(hf / 1e4) / 100); renderSwap(); };
   } else { $('swHave').textContent = ''; $('swHaveTo').textContent = ''; }
