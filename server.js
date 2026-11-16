@@ -72,7 +72,7 @@ async function migrate() {
 async function voidSelfDeposits() {
   OWN.add(TREASURY.toLowerCase());
   if (WD_ON) { try { OWN.add(hot().wallet.account.address.toLowerCase()); } catch {} }
-  const { rows } = await db.query("SELECT tx_hash, log_index, address, amount FROM deposits d WHERE NOT EXISTS (SELECT 1 FROM ledger WHERE kind = 'deposit-void' AND meta->>'tx' = d.tx_hash AND meta->>'log' = d.log_index::text)", [[...OWN]]);
+  const { rows } = await db.query("SELECT tx_hash, log_index, address, amount FROM deposits d WHERE NOT EXISTS (SELECT 1 FROM ledger WHERE kind = 'deposit-void' AND meta->>'tx' = d.tx_hash AND meta->>'log' = d.log_index::text)");
   for (const d of rows) {
     const origin = OWN.has(d.address.toLowerCase()) ? d.address : await txFrom(d.tx_hash).catch(() => null);
     if (!origin || !OWN.has(origin.toLowerCase())) continue;
