@@ -321,9 +321,10 @@ async function solvency(force = false) {
   const [bal, prem, pend] = await Promise.all([
     db.query("SELECT model, SUM(amount) AS n FROM balances WHERE amount > 0 GROUP BY model"), premiums(),
     db.query("SELECT COALESCE(SUM(amount), 0) AS n FROM withdrawals WHERE status IN ('queued', 'review', 'sending', 'sent')")]);
-  let atMarket = Number(pend.rows[0].n) / 1e6, atRef = atMarket, usdgOwed = 0;
+  let atMarket = Number(pend.rows[0].n) / 1e6, atRef = atMarket, usdgOwed = 0; const byAsset = [];
   for (const r of bal.rows) { const P = assetPrice(r.model); if (!P) continue; const n = Number(r.n), p = r.model === USDG ? 0 : prem[r.model] || 0;
-    atMarket += n * P.blend * (1 + p); atRef += n * P.blend; if (r.model === USDG) usdgOwed += n / 1e6; }
+    atMarket += n * P.blend * (1 + p); atRef += n * P.blend; if (r.model === USDG) usdgOwed += n / 1e6;
+    byAsset.push({ asset: r.model, name: r.model === USDG ? 'USDG' : P.name, units: n, usd: n * P.blend * (1 + p) }); }
   let held = null, hotAddr = null, hotUsdg = null, treasuryUsdg = null, hotEth = null;
   if (LIVE) {
     const read = async a => Number(BigInt(await rpc('eth_call', [{ to: USDG_CONTRACT, data: '0x70a08231' + a.slice(2).toLowerCase().padStart(64, '0') }, 'latest']))) / 1e6;
@@ -332,7 +333,7 @@ async function solvency(force = false) {
       if (hotAddr.toLowerCase() !== TREASURY.toLowerCase()) { hotUsdg = await read(hotAddr); held += hotUsdg; } else hotUsdg = treasuryUsdg;
       hotEth = Number(BigInt(await rpc('eth_getBalance', [hotAddr, 'latest']))) / 1e18; }
   }
-  const data = { owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, hotWallet: hotAddr, hotUsdg, hotEth, margin: held == null ? null : held - atMarket, ok: held == null || held >= atMarket, checked: new Date().toISOString() };
+  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, hotWallet: hotAddr, hotUsdg, hotEth, margin: held == null ? null : held - atMarket, ok: held == null || held >= atMarket, checked: new Date().toISOString() };
   if (!data.ok) console.error(`RESERVE ALERT: holds ${held.toFixed(2)} USDG, owes ${atMarket.toFixed(2)} at market. Withdrawals paused.`);
   solv = { at: Date.now(), data }; return data;
 }
@@ -411,6 +412,16 @@ async function api(req, res, p) {
       if (!Number.isSafeInteger(amt) || amt <= 0 || amt > 1e12) return send(res, 400, { error: 'Bad amount' });
       const q = quote(u.searchParams.get('from'), u.searchParams.get('to'), amt, await premiums());
       return q ? send(res, 200, q) : send(res, 400, { error: 'Pick two different models' });
+    }
+
+    // proof of reserves, public: totals only, never anyone's own balance
+    if (p === '/api/reserves' && req.method === 'GET') {
+      if (overLimit('reserves:' + ipOf(req), 60, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      if (!LIVE) return send(res, 200, { live: false });
+      const d = await solvency();
+      return send(res, 200, { live: true, chain: CHAIN.name, explorer: CHAIN.explorer, usdgContract: USDG_CONTRACT, treasury: TREASURY,
+        held: d.held, owedAtMarket: d.owedAtMarket, owedAtReference: d.owedAtReference, pendingWithdrawals: d.pendingWithdrawals,
+        margin: d.margin, ratio: d.owedAtMarket > 0 ? d.held / d.owedAtMarket : null, ok: d.ok, byAsset: d.byAsset.map(({ asset, name, usd }) => ({ asset, name, usd })), checked: d.checked });
     }
 
     if (p === '/api/nonce' && req.method === 'GET') {
