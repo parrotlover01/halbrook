@@ -472,7 +472,7 @@ footer a{color:var(--muted)}
 .tx-field label{font:500 11px/1 var(--b);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .tx-row{display:flex;align-items:center;gap:10px;margin-top:10px}
 .tx-row input,.tx-row .sw-out{flex:1;min-width:0;background:none;border:0;outline:none;color:#fff;font:300 28px/1.1 var(--b);padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tx-u{color:var(--muted);font:400 13px/1 var(--b)}
+.tx-u{display:none}
 .tx-row select{flex:none;max-width:55%;background:#0e0e12;color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:9px 12px;font:500 13px/1 var(--b)}
 .tx .sw-flip{align-self:center;margin:-16px 0;position:relative;z-index:1;width:36px;height:36px;font-size:16px;background:#141418;transform:none}
 .tx .sw-rate{font-size:13px;color:#bdb8b0;text-align:center;margin-top:4px}
@@ -1051,7 +1051,7 @@ html[data-theme="light"] .rh-f{color:#17161b}
     <aside class="tx-card" aria-label="Trade">
       <div id="mkSide" aria-live="polite"></div>
       <div class="tx-swap">
-        <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="number" min="0" step="0.1" value="1" inputmode="decimal" aria-label="Amount in million tokens"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" class="tp-src" aria-label="From model"></select><button type="button" class="tp-btn" id="swFromBtn" aria-haspopup="listbox"></button></div></div>
+        <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="text" value="1M" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Amount, for example 1M, 500K or 10"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" class="tp-src" aria-label="From model"></select><button type="button" class="tp-btn" id="swFromBtn" aria-haspopup="listbox"></button></div></div>
         <button class="sw-flip" id="swFlip" type="button" aria-label="Swap direction">⇅</button>
         <div class="tx-field"><div class="tx-lab"><label>You get</label><span class="tx-have" id="swHaveTo"></span></div><div class="tx-row"><div class="sw-out" id="swOut">—</div><span class="tx-ico" id="swToIco"></span><select id="swTo" class="tp-src" aria-label="To model"></select><button type="button" class="tp-btn" id="swToBtn" aria-haspopup="listbox"></button></div></div>
         <div class="sw-rate" id="swRate">—</div>
@@ -1461,16 +1461,25 @@ document.addEventListener('click', e => { if (tpOpen && !tpOpen.contains(e.targe
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
 addEventListener('scroll', e => { if (tpOpen && !tpOpen.contains(e.target)) closePicker(); }, true); addEventListener('resize', closePicker);
 const fmtM = v => v >= 1 ? v.toFixed(v >= 100 ? 0 : 3) + 'M' : (v * 1000).toFixed(v * 1000 >= 100 ? 0 : 1) + 'K';
+// amount typed in the "You give" field: in millions of tokens for a model (1M, 500K, 2.5M), in dollars for USDG ($10, 1K)
+function swAmount() {
+  const v = String($('swAmt').value || '').trim().replace(/[$,\s]/g, ''), m = /^(\d*\.?\d+)([kmb])?$/i.exec(v);
+  if (!m) return 0;
+  const n = parseFloat(m[1]), k = (m[2] || '').toLowerCase(), usd = $('swFrom').value === 'usdg';
+  if (usd) return n * ({ k: 1e3, m: 1e6, b: 1e9 }[k] || 1);
+  return n * ({ k: 1e-3, m: 1, b: 1e3 }[k] || 1);
+}
 let quoteT = null, quoteN = 0;
+let swUsd = null;   // whether "You give" is in dollars; when that flips, the amount resets to a sensible default
 function renderSwap() {
+  { const u = $('swFrom').value === 'usdg'; if (swUsd !== null && u !== swUsd) $('swAmt').value = u ? '10' : '1M'; swUsd = u; }
   if (typeof renderPickers === 'function') renderPickers();
   if (!$('swFrom').options.length) fillSelects();
-  const a = $('swFrom').value, b = $('swTo').value, amt = Math.max(0, +$('swAmt').value || 0);
+  const a = $('swFrom').value, b = $('swTo').value, amt = swAmount();
   const U = { name: 'USDG' }, f = a === 'usdg' ? U : mk[a], t = b === 'usdg' ? U : mk[b]; if (!f || !t) return;
   const px = id => id === 'usdg' ? 1 : mprice(id);            // USD per 1M units (1M micro-USDG = $1)
   const rate = px(a) / px(b), out = amt * rate * 0.997;
   const show = (id, units) => id === 'usdg' ? '$' + (units / 1e6).toFixed(2) : fmtTok(units);
-  document.querySelector('.tx-u').textContent = a === 'usdg' ? '' : 'M';
   const ico = id => id === 'usdg' ? '<span class="usd">$</span>' : brand((MK.find(x => x.id === id) || {}).logo);
   $('swFromIco').innerHTML = ico(a); $('swToIco').innerHTML = ico(b);
   const own = id => { const x = me && me.balances.find(y => y.model === id); return x ? x.tokens : 0; };
@@ -1481,7 +1490,7 @@ function renderSwap() {
     $('swHaveTo').innerHTML = `Balance: <b>${fmtHave(b, ht)}</b>`;
     if (a === 'usdg' && walUsdg >= 1) $('swHave').innerHTML += ` <span class="sw-wal">In wallet: ${walUsdg.toFixed(2)} USDG · <a href="#" class="sw-dep">deposit</a></span>`;
     const sd = $('swHave').querySelector('.sw-dep'); if (sd) sd.onclick = e => { e.preventDefault(); openFunds('dep'); };
-    const mx = $('swHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('swAmt').value = String(Math.floor(hf / 1e4) / 100); renderSwap(); };
+    const mx = $('swHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('swAmt').value = a === 'usdg' ? String(Math.floor(hf / 1e4) / 100) : hf >= 1e6 ? Math.floor(hf / 1e4) / 100 + 'M' : Math.floor(hf / 10) / 100 + 'K'; renderSwap(); };
   } else { $('swHave').textContent = ''; $('swHaveTo').textContent = ''; }
   $('swOut').textContent = show(b, out * 1e6);
   $('swRate').innerHTML = a === 'usdg' ? `$1 = <b>${fmtM(rate)}</b> ${t.name}` : b === 'usdg' ? `1M ${f.name} = <b>$${rate.toFixed(2)}</b>` : `1M ${f.name} = <b>${fmtM(rate)}</b> ${t.name}`;
@@ -1499,6 +1508,8 @@ function renderSwap() {
   }, 250);
 }
 ['swAmt', 'swFrom', 'swTo'].forEach(i => $(i).addEventListener('input', renderSwap));
+// the amount reads like the result: 1M, 250K, 1.5M for model tokens, plain dollars for USDG
+$('swAmt').addEventListener('blur', () => { const v = $('swAmt').value.trim(); if ($('swFrom').value !== 'usdg' && /^\d*\.?\d+$/.test(v)) { $('swAmt').value = v + 'M'; } });
 $('swFlip').addEventListener('click', () => { const a = $('swFrom').value; $('swFrom').value = $('swTo').value; $('swTo').value = a; renderSwap(); });
 const held = id => { const b = me && me.balances.find(x => x.model === id); return b ? b.tokens : 0; };
 const totalUsd = () => me ? me.balances.reduce((a, x) => a + (x.usd || 0), 0) : 0;
@@ -1509,7 +1520,7 @@ function swMsg(text, action) {
 $('swGo').addEventListener('click', async () => {
   if (!cfg) { $('swNote').textContent = 'Swaps run on halbrook.xyz.'; return; }
   if (!me) { await signIn(); if (!me) return; }
-  const tokens = Math.floor((+$('swAmt').value || 0) * 1e6), from = $('swFrom').value, fromName = from === 'usdg' ? 'USDG' : nameOf(from);
+  const tokens = Math.floor(swAmount() * 1e6), from = $('swFrom').value, fromName = from === 'usdg' ? 'USDG' : nameOf(from);
   if (!(tokens > 0)) return swMsg('Enter an amount to swap.');
   if (!totalUsd()) return swMsg('Your balance is empty. Deposit USDG first, then swap it into any model.', 'deposit');
   const have = held(from);
