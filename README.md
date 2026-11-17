@@ -5,7 +5,7 @@ The true cost of AI, in plain sight. Live at [halbrook.xyz](https://www.halbrook
 - **Proof of reserves**: [halbrook.xyz/reserves](https://www.halbrook.xyz/reserves), live.
 - **Exchange**: every AI model has a reference price (what it really costs to use, from the hosts) and a market price set by players. Swap between models; the premium moves with trades, within ±30% of the reference.
 - **Aggregator**: one balance for every model. Each answer goes to the cheapest host and costs what it really cost. Switch models mid-conversation, with one shared memory.
-- **The film**: the home page is a short interactive film. Find the code to open the briefcase.
+- **The film**: the home page is a short interactive film. Find the code to open the briefcase, or enter the dApp freely.
 
 ## Run it
 

@@ -196,6 +196,8 @@ a{color:inherit}
 #gate p{margin:0;color:var(--muted);font-size:15px}
 .gate-go{margin-top:10px;padding:14px 24px;border-radius:4px;background:#fff;color:#000;font:500 15px/1 var(--b);text-decoration:none}
 .gate-go:hover{background:var(--brass)}
+.gate-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}.gate-go{border:0;cursor:pointer}.gate-try{margin-top:10px;padding:14px 24px;border-radius:4px;border:1px solid rgba(255,255,255,.3);color:#fff;font:500 15px/1 var(--b);text-decoration:none}.gate-try:hover{border-color:#fff}
+html[data-theme="light"] .gate-try{color:#121115;border-color:rgba(18,17,21,.3)}
 .buy-direct{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding-top:14px;border-top:1px solid rgba(255,255,255,.07)}
 .buy-direct span{font:500 11px/1 var(--b);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}
 .buy-direct a{padding:9px 12px;border-radius:8px;background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);color:#fff;font:500 13px/1 var(--b);text-decoration:none}
@@ -1003,13 +1005,14 @@ html[data-theme="light"] .rh-f{color:#17161b}
 <body>
 <div id="gate" hidden>
   <img src="assets/bureau/mark.png" alt="" class="gate-mark">
-  <h1>Crack the briefcase first.</h1>
-  <p>The exchange only opens to agents who found the code.</p>
-  <a class="gate-go" href="./">Open the door</a>
+  <h1>Crack KESTREL, or enter freely.</h1>
+  <p>The briefcase is still there for real agents. The door is open to everyone.</p>
+  <div class="gate-btns"><button class="gate-go" type="button" id="gateSkip">Enter the dApp</button><a class="gate-try" href="./">Try to crack KESTREL</a></div>
 </div>
 <script>
-(() => { let ok = false; try { ok = localStorage.getItem('halbrook-solved') === '1'; } catch (e) {}
-  if (!ok) { const g = document.getElementById('gate'); g.hidden = false; document.documentElement.style.overflow = 'hidden'; } })();
+(() => { let ok = false; try { ok = localStorage.getItem('halbrook-solved') === '1' || localStorage.getItem('halbrook-skip') === '1'; } catch (e) {}
+  if (!ok) { const g = document.getElementById('gate'); g.hidden = false; document.documentElement.style.overflow = 'hidden';
+    document.getElementById('gateSkip').onclick = () => { try { localStorage.setItem('halbrook-skip', '1'); } catch (e) {} g.hidden = true; document.documentElement.style.overflow = ''; }; } })();
 </script>
 <div class="topbar"><header class="site-top">
   <a class="site-mark" href="./"><b>Halbrook</b><small>AI Token Exchange</small></a>
@@ -1154,7 +1157,7 @@ html[data-theme="light"] .rh-f{color:#17161b}
     <div class="foot-brand"><b>Halbrook</b><span>AI token exchange</span><p>The true cost of AI, in plain sight.</p></div>
     <div class="foot-col"><h4>Product</h4><a href="#market">Exchange</a><a href="#ipo">IPO tracker</a><a href="./">The film</a><a href="/reserves">Proof of reserves</a></div>
     <div class="foot-col"><h4>Community</h4><a href="https://x.com/halbrookmarket" target="_blank" rel="noopener" aria-label="Halbrook on X">X</a><a href="https://github.com/parrotlover01/halbrook" target="_blank" rel="noopener" aria-label="Halbrook on GitHub">GitHub</a></div>
-    <div class="foot-token"><span class="tk-pill"><i></i>$HALBROOK</span><b>Soon.</b></div>
+    <div class="foot-token"><span class="tk-pill"><i></i>$HALBROOK</span><b>Live.</b><div class="tk-ca"><span>Contract · Robinhood Chain</span><div class="tk-row"><code id="tkCa">0x3ed7e776d6b6a87d486a369c24b340dc7266e31d</code><button type="button" id="tkCopy">Copy</button><a href="https://robinhoodchain.blockscout.com/token/0x3ed7e776d6b6a87d486a369c24b340dc7266e31d" target="_blank" rel="noopener" aria-label="View $HALBROOK on the explorer">↗</a></div></div></div>
   </div>
   <div class="foot-bot"><span>© 2026 Halbrook</span><span class="foot-ico"><a href="https://x.com/halbrookmarket" target="_blank" rel="noopener" aria-label="X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.67l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23Zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64Z"/></svg></a><a href="https://github.com/parrotlover01/halbrook" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg></a></span></div>
 </div></footer>
@@ -1781,6 +1784,8 @@ function apiLang(l) { document.querySelectorAll('.api-tabs button').forEach(b =>
 document.querySelectorAll('.api-tabs button').forEach(b => b.onclick = () => apiLang(b.dataset.lang));
 apiLang('curl');
 
+/* ---------- $HALBROOK contract address ---------- */
+$('tkCopy').onclick = () => { if (navigator.clipboard) navigator.clipboard.writeText($('tkCa').textContent).then(() => { $('tkCopy').textContent = 'Copied'; setTimeout(() => { $('tkCopy').textContent = 'Copy'; }, 1600); }); };
 /* ---------- light / dark ---------- */
 $('themeBtn').onclick = () => { const l = document.documentElement.dataset.theme !== 'light'; if (l) document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme; try { localStorage.setItem('hb-theme', l ? 'light' : 'dark'); } catch (e) {} };
 /* ---------- API keys ---------- */
