@@ -1002,6 +1002,9 @@ html[data-theme="light"] .acct-b.acct-ghost{background:transparent;color:#121115
 html[data-theme="light"] .rh-f{color:#17161b}
 
 /* leverage tab (shown only when the server turns leverage on) */
+.hiw-row .hiw-api{text-decoration:none}
+.agg-api{padding-top:8px}.api-head{margin:8px 0 22px}.api-head h2{margin:0 0 8px;font:300 clamp(24px,3vw,32px)/1.15 var(--t);color:#fff}
+html[data-theme="light"] .api-head h2{color:#121115}
 .tx-tabs[hidden],.tx-swap[hidden],.tx-lev[hidden]{display:none!important}
 .tx-tabs{display:flex;gap:4px;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 .tx-tabs button{flex:1;padding:10px;border:0;border-radius:9px;background:none;color:var(--muted);font:600 13px/1 var(--b);cursor:pointer}
@@ -1112,7 +1115,7 @@ html[data-theme="light"] .lv-p .up{color:#1d7a4c}html[data-theme="light"] .lv-p 
 </div></section>
 
 <section id="chat" hidden><div class="wrap">
-  <div class="mk-hero"><h1 class="mk-kicker"><img class="mk-bird" src="assets/bureau/mark.png" alt="">Aggregator</h1><p class="chat-sub">Every model, one balance, one shared memory. Switch models anytime: the context follows. Each answer goes to the cheapest host, at its real cost.</p><span class="hiw-row"><button class="hiw-btn" id="hiwBtnAgg" type="button" data-src="assets/bureau/aggregator-works.mp4" data-poster="assets/bureau/aggregator-works.jpg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>How the aggregator works</button></span></div>
+  <div class="mk-hero"><h1 class="mk-kicker"><img class="mk-bird" src="assets/bureau/mark.png" alt="">Aggregator</h1><p class="chat-sub">Every model, one balance, one shared memory. Switch models anytime: the context follows. Each answer goes to the cheapest host, at its real cost.</p><span class="hiw-row"><button class="hiw-btn" id="hiwBtnAgg" type="button" data-src="assets/bureau/aggregator-works.mp4" data-poster="assets/bureau/aggregator-works.jpg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>How the aggregator works</button><a class="hiw-btn hiw-api" href="#api"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>API</a></span></div>
   <div class="chat">
     <div class="chat-top"><span class="ch-logo" id="chLogo"></span><select id="chModel" aria-label="Model"></select><span id="chBal" class="chat-bal"></span><button class="ch-b" id="chNew" type="button">New chat</button><button class="ch-b" id="chMem" type="button" aria-expanded="false">Memory</button></div>
     <div class="mem" id="memP" hidden>
@@ -1126,8 +1129,8 @@ html[data-theme="light"] .lv-p .up{color:#1d7a4c}html[data-theme="light"] .lv-p 
   </div>
 </div></section>
 
-<section id="api" hidden><div class="wrap">
-  <div class="mk-hero"><h1 class="mk-kicker"><img class="mk-bird" src="assets/bureau/mark.png" alt="">API</h1><p class="chat-sub">Every model through one OpenAI-compatible API. Paid from your balance, each request routed to the cheapest host.</p></div>
+<section id="api" class="agg-api" hidden><div class="wrap">
+  <div class="api-head"><h2>Use it in your own apps: the API</h2><p class="chat-sub">The same aggregator through one OpenAI-compatible API. Same balance, same memory, each request routed to the cheapest host.</p></div>
   <div class="api-grid">
     <div class="api-card">
       <h3>Your keys</h3>
@@ -1284,7 +1287,7 @@ function renderAcct() {
     const total = me.balances.reduce((a, b) => a + (b.usd || 0), 0);
     el.innerHTML = `<div class="acct-tot"><span>Your balance</span><b>$${total.toFixed(2)}</b></div>
       <div class="acct-chips">${me.balances.length ? me.balances.map(b => b.model === 'usdg' ? `<span class="chip-b chip-usd">USDG <b>$${(b.tokens / 1e6).toFixed(2)}</b></span>` : `<span class="chip-b">${esc(nameOf(b.model))} <b>${fmtTok(b.tokens)}</b></span>`).join('') : '<span class="acct-t">No tokens yet.</span>'}</div>
-      <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? '' : 'Test mode · real USDG at launch'}</span>`;
+      <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button><button class="acct-b acct-ghost" id="acctKeys" type="button">API key</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? '' : 'Test mode · real USDG at launch'}</span>`;
   }
   const go = $('acctGo'); if (go) go.onclick = () => (account ? signIn() : connectWallet().then(a => a && signIn()));
   const kb = $('acctKeys'); if (kb) kb.onclick = openKeys;
@@ -1753,11 +1756,11 @@ $('ipoRows').innerHTML = IPOS.map(x => {
 
 /* ---------- tabs: Exchange (default) / IPO ---------- */
 function showTab() {
-  const tab = ({ '#ipo': 'ipo', '#chat': 'chat' })[location.hash] || 'market';   // the API tab comes back in a later update
-  ['market', 'chat', 'ipo', 'api'].forEach(t => { $(t).hidden = t !== tab; });
-  if (tab === 'api') renderApi();
+  const tab = ({ '#ipo': 'ipo', '#chat': 'chat', '#api': 'chat' })[location.hash] || 'market';   // the API sits in the Aggregator, under the chat
+  ['market', 'chat', 'ipo'].forEach(t => { $(t).hidden = t !== tab; }); $('api').hidden = tab !== 'chat';
+  if (tab === 'chat') renderApi();
   document.querySelectorAll('.site-nav a[data-tab]').forEach(a => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
-  scrollTo(0, 0);
+  if (location.hash === '#api') requestAnimationFrame(() => $('api').scrollIntoView({ behavior: 'smooth', block: 'start' })); else scrollTo(0, 0);
 }
 addEventListener('hashchange', showTab); showTab();
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';

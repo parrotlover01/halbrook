@@ -56,15 +56,15 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
 </header>
 <div class="wrap">
   <aside class="toc" aria-label="Chapters"><b>Chapters</b>
-    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#chat">4. Aggregator</a><a href="#fees">5. Fees</a><a href="#film">6. The film</a><a href="#faq">7. Safety and FAQ</a>
+    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#chat">4. Aggregator and API</a><a href="#fees">5. Fees</a><a href="#film">6. The film</a><a href="#faq">7. Safety and FAQ</a>
   </aside>
   <main>
     <h1>Halbrook Docs</h1>
     <p class="lead">Everything you need to use Halbrook, in a five-minute read.</p>
 
     <section id="what"><h2><span>1</span>What is Halbrook</h2>
-      <p>Halbrook is an exchange for AI models: one wallet, one balance in USDG, every major model. Buy tokens of the models you believe in at the market price, swap between them, and use them in the Aggregator, where each request goes to the cheapest host.</p>
-      <div class="steps"><div><i>01</i><b>Connect wallet</b><small>sign in, free</small></div><div><i>02</i><b>Deposit USDG</b><small>on Robinhood Chain</small></div><div><i>03</i><b>Trade</b><small>at the market price</small></div><div><i>04</i><b>Use</b><small>in the Aggregator</small></div></div>
+      <p>Halbrook is an exchange for AI models: one wallet, one balance in USDG, every major model. Buy tokens of the models you believe in at the market price, swap between them, and use them in the Aggregator or through the API, where each request goes to the cheapest host.</p>
+      <div class="steps"><div><i>01</i><b>Connect wallet</b><small>sign in, free</small></div><div><i>02</i><b>Deposit USDG</b><small>on Robinhood Chain</small></div><div><i>03</i><b>Trade</b><small>at the market price</small></div><div><i>04</i><b>Use</b><small>Aggregator or API</small></div></div>
       <p>Prices are real and public. They come from the hosts themselves and refresh every 60 seconds.</p>
       <p>Models available today: Claude Opus 5.5, Claude Fable 5.2, GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, Gemini 4 Carbon, Mistral Large 4, DeepSeek V4 Pro and Grok 4.7.</p>
     </section>
@@ -82,23 +82,32 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
       <p>Each model has two prices:</p>
       <ul><li><strong>Reference</strong>: the real cost of using the model, from the hosts. It refreshes every 60 seconds. When a host changes its price, the market price stays where it was and the premium absorbs the change.</li><li><strong>Market</strong>: what the model trades at on Halbrook. Swaps into a model push it up, swaps out push it down.</li></ul>
       <p>The gap between the two is the <strong>premium</strong>. It always stays between −30% and +30% of the reference and only moves with trades: when you sell high, it is because other players bought after you. Buy a model before the hype, swap out when its premium is high.</p>
-      <p>Using your tokens in the Aggregator always counts them at the reference price. So a model trading below its reference is a bargain to use: that is its floor.</p>
+      <p>Using your tokens, in the Aggregator or through the API, always counts them at the reference price. So a model trading below its reference is a bargain to use: that is its floor.</p>
       <p>Big swaps move the premium more, and you pay the average price along the way. Before you confirm, the Exchange shows the premium after your swap. Fee: 0.3%.</p>
       <p>The market table lists each model's reference price, market price, premium and cheapest host. Click a row to see where it sits in the band and every host with its price.</p>
     </section>
 
-    <section id="chat"><h2><span>4</span>Aggregator: chat with every model</h2>
+    <section id="chat"><h2><span>4</span>Aggregator and API: every model</h2>
       <p>Each question goes to the cheapest host for that model, and you pay only what it really cost.</p>
       <ol><li>Open the <a href="/app#chat">Aggregator</a> tab.</li><li>Pick any model.</li><li>Type your question and press Enter.</li></ol>
       <p>Under each answer: the model that wrote it, the tokens used, the price in dollars, the host it went to, and the saving against the official price. Each answer is paid from your tokens of that model if you hold some, otherwise straight from your USDG at its real cost. No balance? Deposit USDG first.</p>
       <p><strong>One conversation, every model.</strong> Switch models in the middle of a conversation: the new model sees everything said before. <strong>New chat</strong> starts fresh.</p>
       <p><strong>Shared memory.</strong> Click <strong>Memory</strong> to save short notes about you or your work (“I write Python”, “my startup sells to dentists”). Every model reads them, so you never repeat yourself. Notes are encrypted on our server; <strong>Forget everything</strong> deletes them for good.</p>
+      <p><strong>The API.</strong> Use the same aggregator in any app that works with OpenAI: Cursor, scripts, agents. Same balance, same memory, same cheapest-host routing, paid from your model tokens or your USDG.</p>
+      <ol><li>Sign in and click <strong>API key</strong> on your balance, or open the <a href="/app#api">API</a> at the bottom of the Aggregator.</li><li>Click <strong>Create a key</strong> and copy it right away: it is shown only once.</li><li>In your app, set the base URL and the key.</li></ol>
+<pre>Base URL   https://www.halbrook.xyz/v1
+API key    hb_…
+
+curl https://www.halbrook.xyz/v1/chat/completions \
+  -H "Authorization: Bearer hb_…" \
+  -d '{"model":"claude-opus-5.5","messages":[{"role":"user","content":"Hello"}]}'</pre>
+      <p>Before each request, Halbrook sets aside the most it could cost; after the answer, you pay the real cost and the rest comes back. Streaming works, and <code>GET /v1/models</code> lists the models and their prices. Add the header <code>X-Halbrook-Memory: on</code> to give the model your shared memory notes. Limits: 60 requests a minute per key, 4 at a time per account, 5 keys per account. Lost a key? Revoke it in one click.</p>
     </section>
 
     <section id="fees"><h2><span>5</span>Fees and pricing</h2>
       <table><thead><tr><th>What</th><th>Fee</th><th>Example</th></tr></thead><tbody>
         <tr><td>Swap</td><td>0.3%</td><td>$10 swapped, $0.03 fee</td></tr>
-        <tr><td>Aggregator</td><td>5% on top of the real cost</td><td>$0.0020 answer, $0.0021 paid</td></tr>
+        <tr><td>Aggregator and API</td><td>5% on top of the real cost</td><td>$0.0020 answer, $0.0021 paid</td></tr>
         <tr><td>Withdrawal</td><td>0.50 USDG</td><td>Withdraw 20 USDG, receive 19.50</td></tr>
         <tr><td>Deposit, sign-in</td><td>Free</td><td>You only pay the network gas on deposit, a few cents</td></tr>
       </tbody></table>
