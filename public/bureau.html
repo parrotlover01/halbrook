@@ -1088,6 +1088,11 @@ html[data-theme="light"] .tvb-px .up{color:#1d7a4c}html[data-theme="light"] .tvb
 .acct-chips .chip-b .brand,.acct-chips .chip-b .usd{width:20px;height:20px;flex:none;border-radius:50%;display:grid;place-items:center}
 .acct-chips .chip-b .brand img{width:11px;height:11px}
 .acct-chips .chip-b .usd{background:linear-gradient(180deg,#1f6f4a,#0e3a27);color:#bff5d8;font:600 11px/1 var(--b)}
+
+.tv-dot{stroke:#0b0b0e;stroke-width:1.2;opacity:.95}.tv-dot.mine{stroke:#fff;stroke-width:1.6}
+.tv-side{font-style:normal;font-weight:600}.tv-side.up{color:#5fd39a}.tv-side.dn{color:#ff7a88}
+html[data-theme="light"] .tv-dot{stroke:#f6f4f0}html[data-theme="light"] .tv-dot.mine{stroke:#121115}
+html[data-theme="light"] .tv-side.up{color:#1d7a4c}html[data-theme="light"] .tv-side.dn{color:#c21d31}
 </style>
 </head>
 <body>
@@ -1330,7 +1335,7 @@ async function loadMe() {
     if (account && r.address && r.address.toLowerCase() !== account.toLowerCase()) { token = null; try { localStorage.removeItem('hb-token'); } catch (e) {} me = null; }
     else { me = r; loadWallet(); }
   }
-  renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi(); if (typeof loadLev === 'function' && lev && lev.enabled) loadLev();
+  renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi(); if (typeof renderChart === 'function' && typeof sel !== 'undefined') renderChart(true); if (typeof loadLev === 'function' && lev && lev.enabled) loadLev();
 }
 let flashT = null;
 function flash(t) { const el = $('acctMsg'); if (!el) { if (t) { $('walMsg').textContent = t; $('walPop').hidden = false; } return; } el.textContent = t; clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ''; }, 5000); }
@@ -1637,7 +1642,7 @@ $('swGo').addEventListener('click', async () => {
   const r = await api('/api/swap', { method: 'POST', body: JSON.stringify({ from, to: $('swTo').value, tokens }) });
   if (!r.ok) { swMsg(r.error || 'Swap failed. Try again.', /enough/i.test(r.error || '') ? 'deposit' : null); return; }
   $('swNote').textContent = `Swapped ${fmtTok(r.gave)} ${nameOf($('swFrom').value)} → ${fmtTok(r.got)} ${nameOf($('swTo').value)}`;
-  me.balances = r.balances; renderAcct(); renderChatTop(); loadMkt();
+  me.balances = r.balances; renderAcct(); renderChatTop(); loadMkt(); if (typeof renderChart === 'function') renderChart(true);
 });
 /* ---------- leverage: long / short a model with x2 to x5, margin in USDG (only when the server turns it on) ---------- */
 let lev = null, lvSide = 'long', lvX = 2, lvPositions = [];
@@ -1703,7 +1708,7 @@ async function renderChart(force) {
   $('tvR').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === tvRange));
   if (force || key !== tvKey || Date.now() - tvAt > 60_000) {
     tvKey = key; tvAt = Date.now();
-    try { const r = await fetch(`/api/chart?model=${encodeURIComponent(sel)}&range=${tvRange}`); if (!r.ok) return; const d = await r.json(); if (tvKey !== key) return; tvData = d; } catch (e) { return; }
+    try { const r = await fetch(`/api/chart?model=${encodeURIComponent(sel)}&range=${tvRange}`, { headers: token ? { Authorization: 'Bearer ' + token } : {} }); if (!r.ok) return; const d = await r.json(); if (tvKey !== key) return; tvData = d; } catch (e) { return; }
   }
   drawChart();
 }
@@ -1734,6 +1739,8 @@ function drawInto(el, k) {
     ${ticks.map(v => `<line class="tv-grid" x1="0" x2="${pw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/>${Math.abs(Y(v) - refY) < 16 || Math.abs(Y(v) - Y(last)) < 16 ? '' : `<text class="tv-ax" x="${pw + 8}" y="${(Y(v) + 3.5).toFixed(1)}">${fmtA(v)}</text>`}`).join('')}
     <line class="tv-ref" x1="0" x2="${pw}" y1="${refY.toFixed(1)}" y2="${refY.toFixed(1)}"/>${Math.abs(refY - Y(last)) < 18 ? '' : `<rect class="tv-refb" x="${pw + 2}" y="${(refY - 9).toFixed(1)}" width="${R - 4}" height="18" rx="4"/><text class="tv-reft" x="${pw + 2 + (R - 4) / 2}" y="${(refY + 3.4).toFixed(1)}" text-anchor="middle">REF</text>`}
     <path d="${area}" fill="url(#tvG${k})"/><path d="${path}H${X(t1).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>
+    ${(() => { const tr = P.filter(q => q[3]), few = tr.length <= 150;
+      return tr.filter(q => few || q[4]).map(q => `<circle class="tv-dot${q[4] ? ' mine' : ''}" cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="${q[4] ? 4.4 : 2.6}" fill="${q[3] > 0 ? '#3ccf8e' : '#ef5a6f'}"/>`).join(''); })()}
     <circle cx="${X(t1).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="3.2" fill="${col}"/>
     <rect x="${pw + 2}" y="${(Y(last) - 9).toFixed(1)}" width="${R - 4}" height="18" rx="4" fill="${col}"/><text x="${pw + 2 + (R - 4) / 2}" y="${(Y(last) + 3.6).toFixed(1)}" text-anchor="middle" style="font:600 10px var(--m);fill:#06120c">${fmt(last)}</text>
     <text class="tv-ax" x="0" y="${H - 3}">${tf(t0)}</text><text class="tv-ax" x="${pw}" y="${H - 3}" text-anchor="end">${tf(t1)}</text>
@@ -1741,9 +1748,13 @@ function drawInto(el, k) {
   const svg = el.querySelector('svg'), g = $('tvX' + k), tip = $('tvTip' + k);
   const move = e => { const r = svg.getBoundingClientRect(), x = Math.max(0, Math.min(pw, (e.clientX - r.left) * W / r.width)), t = t0 + x / pw * (t1 - t0);
     let j = 0; for (let i = 0; i < P.length; i++) if (P[i][0] <= t) j = i;
+    // snap to a trade dot when the cursor is on one
+    let near = -1, nd = 7; for (let i = 0; i < P.length; i++) if (P[i][3]) { const dd = Math.abs(X(P[i][0]) - x); if (dd < nd) { nd = dd; near = i; } }
+    if (near >= 0) j = near;
     const v = P[j][1], y = Y(v); g.style.display = ''; $('tvXl' + k).setAttribute('x1', x); $('tvXl' + k).setAttribute('x2', x); $('tvXc' + k).setAttribute('cx', x); $('tvXc' + k).setAttribute('cy', y);
     tip.hidden = false; tip.style.left = Math.max(48, Math.min(r.width - 48, x * r.width / W)) + 'px';
-    tip.innerHTML = `${fmt(v)} / M<small>${new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>`; };
+    const hitT = near >= 0 ? P[near] : null;
+    tip.innerHTML = (hitT ? `<em class="tv-side ${hitT[3] > 0 ? 'up' : 'dn'}">${hitT[3] > 0 ? 'Buy' : 'Sell'}${hitT[4] ? ' · you' : ''}</em> ` : '') + `${fmt(v)} / M<small>${new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>`; };
   svg.onpointermove = move; svg.onpointerdown = move; svg.onpointerleave = () => { g.style.display = 'none'; tip.hidden = true; };
 }
 function tvChgHtml() { const P = tvData && tvData.points; if (!P || P.length < 2) return ''; const a = P[0][1], z = P[P.length - 1][1], c = (z - a) / a * 100;
