@@ -1302,7 +1302,7 @@ function updWal() { $('walBtn').textContent = !account ? 'Connect wallet' : (me 
   const hb = $('hdrBal'); hb.hidden = !me;
   if (me) $('hdrBalV').textContent = '$' + me.balances.reduce((a, x) => a + (x.usd || 0), 0).toFixed(2); }
 $('walGo').addEventListener('click', e => { e.stopPropagation(); if (account) { setAccount(null); token = null; try { localStorage.removeItem('hb-token'); } catch (x) {} $('walPop').hidden = true; } else connectWallet().then(a => a && cfg && signIn()); });
-if (window.ethereum) { window.ethereum.request({ method: 'eth_accounts' }).then(a => a && a[0] && setAccount(a[0])).catch(() => {}); window.ethereum.on && window.ethereum.on('accountsChanged', a => setAccount(a[0])); }
+if (window.ethereum) { window.ethereum.request({ method: 'eth_accounts' }).then(a => a && a[0] && setAccount(a[0])).catch(() => {}); window.ethereum.on && window.ethereum.on('accountsChanged', a => setAccount(a[0])); window.ethereum.on && window.ethereum.on('chainChanged', () => { if (typeof loadWallet === 'function') loadWallet(); }); }
 /* ---------- account: sign-in, balances (server API) ---------- */
 let cfg = null, token = null, me = null;
 try { token = localStorage.getItem('hb-token'); } catch (e) {}
@@ -1315,8 +1315,9 @@ const fmtTok = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3)
 const nameOf = id => (cfg && (cfg.models.find(m => m.id === id) || {}).name) || id;
 async function signIn() {
   if (!account) { await connectWallet(); if (!account) return; }
-  const n = await api('/api/nonce'); if (!n.nonce) return;
-  const message = `Sign in to Halbrook\nAddress: ${account}\nNonce: ${n.nonce}`;
+  const n = await api('/api/nonce?address=' + encodeURIComponent(account)); if (!n.nonce) return;
+  // Sign-In with Ethereum (EIP-4361): the wallet shows which site is asking, and warns if it is not this one
+  const message = `${location.host} wants you to sign in with your Ethereum account:\n${n.address || account}\n\nSign in to Halbrook.\n\nURI: ${location.origin}\nVersion: 1\nChain ID: 4663\nNonce: ${n.nonce}\nIssued At: ${new Date().toISOString()}`;
   try {
     const hex = '0x' + Array.from(new TextEncoder().encode(message)).map(b => b.toString(16).padStart(2, '0')).join('');
     const signature = await window.ethereum.request({ method: 'personal_sign', params: [hex, account] });
@@ -1916,7 +1917,7 @@ async function openFunds(tab) {
     <div class="fd-addr"><span>Deposit address</span><code>${esc(F.address)}</code><button class="acct-b" type="button" id="fdCopy">Copy</button></div>
     <div class="fd-avail"><span>In your wallet</span><b id="fdWal">…</b></div>
     <div class="fd-send"><div class="fd-in"><input id="fdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button type="button" class="tx-max" id="fdMax">Max</button></div><button class="sw-go" type="button" id="fdSend">Send from my wallet</button></div>
-    <p class="fd-warn">Only USDG, only on ${esc(F.chainName)}, only from your connected wallet. Anything else cannot be credited.</p>
+    <p class="fd-warn">Only USDG, only on ${esc(F.chainName)}, only from your connected wallet. Never send straight from an exchange or a smart-contract wallet (Safe, smart account): it would not reach your balance automatically.</p>
     <p class="fd-get">No USDG yet? It is the Global Dollar by Paxos: <a href="https://globaldollar.com" target="_blank" rel="noopener">see where to get it ↗</a></p>`
     : `<h3>Deposit USDG</h3><p>Real deposits open at launch: USDG on Robinhood Chain, credited in under a minute. During the test, use the free test credit in your balance.</p><p class="fd-get">USDG is the Global Dollar by Paxos: <a href="https://globaldollar.com" target="_blank" rel="noopener">see where to get it ↗</a></p>`;
   const wdOpen = F.live && F.withdrawals;
@@ -1953,6 +1954,12 @@ async function sendDeposit() {
     try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: hex }] }); }
     catch (e) { if (e.code !== 4902) throw e;
       await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: hex, chainName: F.chainName, nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: [F.rpc], blockExplorerUrls: [F.explorer] }] }); }
+    // never send unless the wallet really is on Robinhood Chain (some wallets resolve the switch without switching)
+    const onChain = await window.ethereum.request({ method: 'eth_chainId' });
+    if (parseInt(onChain, 16) !== F.chainId) return msg('Switch your wallet to Robinhood Chain and try again');
+    // and from the account you are signed in with: a deposit is credited to the wallet that sends it
+    const [active] = await window.ethereum.request({ method: 'eth_accounts' });
+    if (!active || active.toLowerCase() !== me.address.toLowerCase()) return msg(`Switch your wallet to ${short(me.address)} first`);
     // ERC-20 transfer(address,uint256) to the deposit address, from the signed-in wallet
     const data = '0xa9059cbb' + F.address.slice(2).toLowerCase().padStart(64, '0') + BigInt(v).toString(16).padStart(64, '0');
     msg('Confirm in your wallet…');

@@ -9,12 +9,14 @@ const ROOT = path.join(__dirname, 'public'), PORT = process.env.PORT || 3000;
 const TEST_MODE = process.env.TEST_MODE === '1';
 const MARGIN = Number(process.env.MARGIN || 0.05);
 const SWAP_FEE = 0.003;
-const SECRET = process.env.SESSION_SECRET || '';
+const SECRET = (process.env.SESSION_SECRET || '').length >= 32 ? process.env.SESSION_SECRET : '';   // shorter than 32 characters: no sessions at all
+if (!SECRET) console.error('SESSION_SECRET is missing or shorter than 32 characters: sign-in is off');
 const OR_KEY = process.env.OPENROUTER_API_KEY || '';
 const MODELS = ['anthropic/claude-opus-5.5', 'anthropic/claude-fable-5.2', 'openai/gpt-6-astra', 'openai/gpt-6.1-sol', 'openai/gpt-6.1-terra', 'google/gemini-4-carbon', 'mistralai/mistral-large-4-0', 'deepseek/deepseek-v4-pro', 'x-ai/grok-4.7'];
 const FAUCET = { model: 'mistralai/mistral-large-4-0', tokens: 2_000_000 }; // test credit, once per wallet
 const FAUCET_PER_IP = Number(process.env.FAUCET_PER_IP || 3);            // test credits per IP per day
-const CHAT_DAILY_USD = Number(process.env.CHAT_DAILY_USD || 10);         // hard cap on what chat + API may spend per day, all users
+const CHAT_DAILY_USD = Number(process.env.CHAT_DAILY_USD || 100);        // breaker on what chat + API may spend per day, all users (every request is prepaid)
+const CHAT_USER_DAILY_USD = Number(process.env.CHAT_USER_DAILY_USD || 20); // per account, 24 h
 const FAUCET_TOTAL_USD = Number(process.env.FAUCET_TOTAL_USD || 100);    // all test credit ever given, all wallets together
 // market layer: each model trades at reference x (1 + premium); swaps move the premium, it stays in the band
 // and fades back toward 0 when nobody trades. Using tokens (chat, API) always counts them at the reference price.
@@ -27,20 +29,23 @@ const USDG_CONTRACT = process.env.USDG_CONTRACT || '0x5fc5360D0400a0Fd4f2af552AD
 const TREASURY = (() => { try { return process.env.TREASURY_ADDRESS ? getAddress(process.env.TREASURY_ADDRESS.trim()) : null; } catch { return null; } })();
 const LIVE = !TEST_MODE && !!TREASURY;
 const WD_ON = LIVE && process.env.WITHDRAWALS_ENABLED === '1' && !!process.env.TREASURY_PRIVATE_KEY;
-const WD_MAX = Number(process.env.WITHDRAW_MAX_USD || 100);              // per withdrawal
-const WD_DAILY = Number(process.env.WITHDRAW_DAILY_USD || 200);          // per account, 24 h
-const WD_AUTO = Number(process.env.WITHDRAW_AUTO_USD || 50);             // above this, waits for the admin
-const WD_GLOBAL = Number(process.env.WITHDRAW_GLOBAL_DAILY_USD || 1000); // all accounts, 24 h
+const WD_MAX = Number.isFinite(Number(process.env.WITHDRAW_MAX_USD)) && Number(process.env.WITHDRAW_MAX_USD) > 0 ? Number(process.env.WITHDRAW_MAX_USD) : 100;              // per withdrawal
+const WD_DAILY = Number.isFinite(Number(process.env.WITHDRAW_DAILY_USD)) && Number(process.env.WITHDRAW_DAILY_USD) > 0 ? Number(process.env.WITHDRAW_DAILY_USD) : 200;          // per account, 24 h
+const WD_AUTO = Number.isFinite(Number(process.env.WITHDRAW_AUTO_USD)) && Number(process.env.WITHDRAW_AUTO_USD) > 0 ? Number(process.env.WITHDRAW_AUTO_USD) : 50;             // above this, waits for the admin
+const WD_GLOBAL = Number.isFinite(Number(process.env.WITHDRAW_GLOBAL_DAILY_USD)) && Number(process.env.WITHDRAW_GLOBAL_DAILY_USD) > 0 ? Number(process.env.WITHDRAW_GLOBAL_DAILY_USD) : 1000; // all accounts, 24 h
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const CONFIRMATIONS = 5;
 let liveReady = false;
 const BAND = 0.30;                                                       // premium stays within -30% .. +30%
 const DEPTH_USD = Number(process.env.MARKET_DEPTH_USD || 10);           // USD of net flow that moves a premium by 10 points
 const HALF_LIFE_H = Number(process.env.MARKET_HALF_LIFE_H || 0);        // 0 = premiums never fade on their own: a pure player-vs-player market
-const WD_FEE = Number(process.env.WITHDRAW_FEE_USD || 0.5);
+const WD_FEE = Number.isFinite(Number(process.env.WITHDRAW_FEE_USD)) && Number(process.env.WITHDRAW_FEE_USD) > 0 ? Number(process.env.WITHDRAW_FEE_USD) : 0.5;
 const API_ON = process.env.API_ENABLED === '1';
+const SITE_HOSTS = (process.env.SITE_HOSTS || 'www.halbrook.xyz,halbrook.xyz').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
 // leverage: off unless LEVERAGE_ENABLED=1 (see the leverage block below)
-const LEV_ON = process.env.LEVERAGE_ENABLED === '1';
+// Leverage stays off until the market can resist a pushed price: with no premium decay and thin depth, a premium can be
+// held at the band edge for the whole TWAP window for a few cents of fees. LEVERAGE_I_UNDERSTAND_THE_RISK=1 is required.
+const LEV_ON = process.env.LEVERAGE_ENABLED === '1' && process.env.LEVERAGE_I_UNDERSTAND_THE_RISK === '1';
 const LEV_MIN = 2, LEV_MAX = Math.min(5, Math.max(LEV_MIN, Number(process.env.LEVERAGE_MAX || 5)));
 // flagship models go up to LEV_MAX, every other model (and every model added later) up to x2
 const LEV_FLAGSHIP = (process.env.LEVERAGE_FLAGSHIP || 'anthropic/claude-opus-5.5,openai/gpt-6-astra').split(',').map(x => x.trim()).filter(Boolean);
@@ -114,6 +119,7 @@ async function goLive() {
       await c.query('BEGIN');
       await c.query('UPDATE balances SET amount = 0');
       await c.query('UPDATE market SET premium = 0, updated = now()');
+      await c.query("UPDATE positions SET status = 'voided', closed = now(), payout = 0 WHERE status = 'open'");
       await c.query("INSERT INTO ledger (address, kind, amount, meta) VALUES ('*', 'go-live-reset', 0, $1)", [JSON.stringify({ block: head })]);
       await c.query("INSERT INTO settings (key, value) VALUES ('live_since', $1), ('deposit_block', $2)", [new Date().toISOString(), String(head)]);
       await c.query('COMMIT');
@@ -133,7 +139,7 @@ async function refreshPrices() {
       const pin = +m.pricing.prompt || 0, pout = +m.pricing.completion || 0;
       next[m.id] = { name: String(m.name || m.id).replace(/^[^:]+:\s*/, '').replace(/[<>"'&`]/g, '').slice(0, 60), pin, pout, blend: (3 * pin + pout) / 4 };
     }
-    if (Object.keys(next).length) { PRICES = next; await anchorMarket().catch(e => console.error('anchor', e.message)); }
+    if (Object.keys(next).length) { PRICES = { ...PRICES, ...next }; await anchorMarket().catch(e => console.error('anchor', e.message)); }
   } catch (e) { console.error('prices', e.message); }
 }
 // When a host changes a model's official price, keep its market price where it was and let the premium
@@ -200,9 +206,12 @@ async function reserve(user, model, messages, maxOut) {
   const P = priceOf(model); if (!P) return { code: 400, error: 'Unknown model' };
   const spent = await db.query("SELECT COALESCE(SUM((meta->>'paid')::numeric), 0) AS usd FROM ledger WHERE kind = 'chat' AND ts > now() - interval '1 day'");
   if (Number(spent.rows[0].usd) >= CHAT_DAILY_USD) return { code: 503, error: 'Halbrook has reached its daily usage limit. Back tomorrow.' };
-  const chars = JSON.stringify(messages).length;
+  const mine = await db.query("SELECT COALESCE(SUM((meta->>'paid')::numeric), 0) AS usd FROM ledger WHERE kind = 'chat' AND address = $1 AND ts > now() - interval '1 day'", [user]);
+  if (Number(mine.rows[0].usd) >= CHAT_USER_DAILY_USD) return { code: 429, error: `Daily limit for this account reached ($${CHAT_USER_DAILY_USD}). Back tomorrow.` };
+  const text = JSON.stringify(messages), ascii = text.replace(/[^\x20-\x7e]/g, '').length;
+  const tokensIn = Math.ceil(ascii / 3 + (text.length - ascii) * 1.5);   // plain text ~3 chars a token, dense text up to 1.5 tokens a char
   // long prompt, full answer, host up to 25% above the official price, plus the margin
-  const worstUsd = (chars / 3 * P.pin + maxOut * P.pout) * 1.25 * (1 + MARGIN);
+  const worstUsd = (tokensIn * P.pin + maxOut * P.pout) * 1.25 * (1 + MARGIN);
   // pay with this model's tokens if you hold enough, otherwise straight from your USDG at the real cost
   for (const [payIn, unit, min] of [[model, P.blend, 2000], [USDG, 1e-6, 10_000]]) {
     const hold = Math.max(min, Math.ceil(worstUsd / unit));
@@ -213,16 +222,18 @@ async function reserve(user, model, messages, maxOut) {
 }
 async function release(h) { await db.query('UPDATE balances SET amount = amount + $3 WHERE address = $1 AND model = $2', [h.user, h.payIn, h.hold]); }
 async function settle(h, usage, provider, meta) {
-  const u = usage || {}, pin = u.prompt_tokens || 0, pout = u.completion_tokens || 0, P = h.P;
+  const u = usage || {}, pin = u.prompt_tokens || 0, pout = u.completion_tokens || 0, P = h.P, unknown = !pin && !pout && typeof u.cost !== 'number';
+  if (unknown) console.error('chat: the host reported no usage, billing the reservation', h.user, h.model);
   const refCost = pin * P.pin + pout * P.pout;                                  // what the official price would charge
   const paid = typeof u.cost === 'number' && u.cost >= 0 ? u.cost : refCost;    // what the routed host actually charged
   const charge = paid * (1 + MARGIN);                                           // what the user pays
-  const debit = Math.ceil(charge / h.unit);                                     // in this model's tokens, or in micro-USDG
+  const debit = unknown ? h.hold : Math.ceil(charge / h.unit);                  // in this model's tokens, or in micro-USDG
   const back = h.hold - debit;                                                  // unused part of the reservation
   const c = await db.connect();
   try {
     await c.query('BEGIN');
     await c.query('UPDATE balances SET amount = GREATEST(amount + $3, 0) WHERE address = $1 AND model = $2', [h.user, h.payIn, back]);
+    if (back < 0) console.error('chat cost above its hold', h.user, h.model, 'short by', -back, h.payIn === USDG ? 'micro-USDG' : 'tokens');
     await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'chat',$2,$3,$4)", [h.user, h.payIn, -debit, JSON.stringify({ model: h.model, pin, pout, paid, refCost, provider: typeof provider === 'string' ? provider.slice(0, 60) : null, ...meta })]);
     if (meta && meta.key) await c.query('UPDATE api_keys SET spent = spent + $2, last_used = now() WHERE id = $1', [meta.key, charge]);
     await c.query('COMMIT');
@@ -291,7 +302,13 @@ async function scanDeposits() {
           if (amount === '0' || OWN.has(sender.toLowerCase())) continue;   // the treasury paying itself is not a deposit
           const origin = await txFrom(l.transactionHash);
           if (origin && OWN.has(origin.toLowerCase())) continue;           // the treasury buying USDG through a router: not a deposit either
-          if (origin && await isContract(sender)) sender = origin;         // sent through a contract (router, bridge): credit the wallet that signed
+          // sent by a contract (Safe, smart account, router, stream): whoever signed the transaction is not necessarily the owner
+          // (anyone can submit a signed Safe transaction), so it is recorded but not credited until it is checked by hand
+          if (await isContract(sender)) {
+            const held = await c.query('INSERT INTO deposits (tx_hash, log_index, address, amount, block) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [l.transactionHash, parseInt(l.logIndex, 16), sender, amount, parseInt(l.blockNumber, 16)]);
+            if (held.rowCount) { await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'deposit-held',$2,$3,$4)", [sender, USDG, amount, JSON.stringify({ tx: l.transactionHash, origin })]); console.error('DEPOSIT HELD for review: sent by a contract', sender, Number(amount) / 1e6, 'USDG, tx', l.transactionHash); }
+            continue;
+          }
           const ins = await c.query('INSERT INTO deposits (tx_hash, log_index, address, amount, block) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [l.transactionHash, parseInt(l.logIndex, 16), sender, amount, parseInt(l.blockNumber, 16)]);
           if (!ins.rowCount) continue;
           await c.query('INSERT INTO users (address) VALUES ($1) ON CONFLICT DO NOTHING', [sender]);
@@ -338,7 +355,7 @@ async function solvency(force = false) {
   if (!force && solv.data && Date.now() - solv.at < 60_000) return solv.data;
   const [bal, prem, pend] = await Promise.all([
     db.query("SELECT model, SUM(amount) AS n FROM balances WHERE amount > 0 GROUP BY model"), premiums(),
-    db.query("SELECT COALESCE(SUM(amount), 0) AS n FROM withdrawals WHERE status IN ('queued', 'review', 'sending', 'sent')")]);
+    db.query("SELECT COALESCE(SUM(amount), 0) AS n FROM withdrawals WHERE status IN ('queued', 'review', 'sending', 'sent', 'unknown')")]);
   // What Halbrook really owes on each asset: the most a holder can get out of it, either by selling it all
   // back to USDG now (the sale moves the premium down, as any trade does) or by spending it at the reference price.
   // Valuing at the last market price instead would count a buyer's own price impact as a debt.
@@ -387,7 +404,7 @@ async function processWithdrawals() {
       if (have < amount) { await db.query("UPDATE withdrawals SET status = 'queued', error = 'hot wallet low', updated = now() WHERE id = $1", [w.id]); console.error('withdrawals: the hot wallet needs more USDG'); break; }
       let hash;
       try { hash = await wallet.writeContract({ address: USDG_CONTRACT, abi: ERC20, functionName: 'transfer', args: [getAddress(w.address), amount] }); }
-      catch (e) { await db.query("UPDATE withdrawals SET status = 'review', error = $2, updated = now() WHERE id = $1", [w.id, String(e.shortMessage || e.message).slice(0, 200)]); console.error('withdraw send failed, moved to review', w.id); break; }
+      catch (e) { await db.query("UPDATE withdrawals SET status = 'unknown', error = $2, updated = now() WHERE id = $1", [w.id, String(e.shortMessage || e.message).slice(0, 200)]); console.error('WITHDRAWAL OUTCOME UNKNOWN: check the hot wallet on the explorer before doing anything', w.id); break; }
       await db.query("UPDATE withdrawals SET status = 'sent', tx_hash = $2, updated = now() WHERE id = $1", [w.id, hash]);
       const rc = await pub.waitForTransactionReceipt({ hash, timeout: 120_000 }).catch(() => null);
       if (rc && rc.status === 'success') await db.query("UPDATE withdrawals SET status = 'done', updated = now() WHERE id = $1", [w.id]);
@@ -411,9 +428,15 @@ function quote(from, to, amt, prem) {
   const a0 = from === USDG ? 0 : prem[from] || 0, b0 = to === USDG ? 0 : prem[to] || 0;   // USDG is always worth $1
   const v0 = amt * PF.blend * (1 + a0), dp = v0 * 0.10 / DEPTH_USD;
   const a1 = from === USDG ? 0 : clampP(a0 - dp), b1 = to === USDG ? 0 : clampP(b0 + dp);
-  const value = amt * PF.blend * (1 + (a0 + a1) / 2);
-  const out = Math.floor(value / (PT.blend * (1 + (b0 + b1) / 2)) * (1 - SWAP_FEE));
-  return { out, valueUsd: value, fee: SWAP_FEE, from: { premium: a0, after: a1 }, to: { premium: b0, after: b1 } };
+  // The part of an order that would push a premium past the band trades flat at the band edge. Pricing the whole order
+  // at the midpoint (as before) let small buys up to the edge plus one big sell back down create USDG out of nothing;
+  // refusing it would trap holders at the floor. At the edge, every round trip loses at least the fees, and you can
+  // always sell (at the floor price at worst).
+  const fA = from === USDG || dp <= 0 ? 1 : Math.min(1, Math.max(0, a0 + BAND) / dp);   // share of the order inside the band, sell side
+  const fB = to === USDG || dp <= 0 ? 1 : Math.min(1, Math.max(0, BAND - b0) / dp);     // and buy side
+  const value = amt * PF.blend * (fA * (1 + (a0 + a1) / 2) + (1 - fA) * (1 + a1));
+  const out = Math.floor(value * (fB / (PT.blend * (1 + (b0 + b1) / 2)) + (1 - fB) / (PT.blend * (1 + b1))) * (1 - SWAP_FEE));
+  return { out, valueUsd: value, fee: SWAP_FEE, atEdge: fA < 1 || fB < 1, from: { premium: a0, after: a1 }, to: { premium: b0, after: b1 } };
 }
 function marketView(prem) {
   return MODELS.filter(m => priceOf(m)).map(m => { const ref = PRICES[m].blend * 1e6, p = prem[m] || 0;
@@ -588,17 +611,22 @@ async function api(req, res, p) {
       const nonce = crypto.randomBytes(12).toString('hex');
       await db.query('INSERT INTO nonces (nonce) VALUES ($1)', [nonce]);
       await db.query("DELETE FROM nonces WHERE created < now() - interval '15 minutes'");
-      return send(res, 200, { nonce });
+      let address = null; try { address = getAddress(new URL(req.url, 'http://x').searchParams.get('address') || ''); } catch {}
+      return send(res, 200, { nonce, address });
     }
 
     if (p === '/api/login' && req.method === 'POST') {
       if (overLimit('login:' + ipOf(req), 20, 60_000)) return send(res, 429, { error: 'Slow down a little' });
       const { address, message, signature } = await readJSON(req);
       let addr; try { addr = getAddress(address); } catch { return send(res, 400, { error: 'Bad address' }); }
-      // exact message only: a signature made for anything else can never open a session
-      const m = typeof message === 'string' && /^Sign in to Halbrook\nAddress: (0x[0-9a-fA-F]{40})\nNonce: ([0-9a-f]{24})$/.exec(message);
-      if (!m || m[1].toLowerCase() !== addr.toLowerCase() || typeof signature !== 'string') return send(res, 400, { error: 'Bad message' });
-      const nonce = m[2];
+      // Sign-In with Ethereum (EIP-4361), exact form only: bound to this site's domain and chain, fresh, single-use nonce.
+      // A look-alike site cannot relay it: the domain it names would not be ours, and wallets warn on a domain mismatch.
+      const m = typeof message === 'string' && /^([a-z0-9.-]+(?::\d+)?) wants you to sign in with your Ethereum account:\n(0x[0-9a-fA-F]{40})\n\nSign in to Halbrook\.\n\nURI: (https?:\/\/[^\n]+)\nVersion: 1\nChain ID: (\d+)\nNonce: ([0-9a-f]{24})\nIssued At: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z)$/.exec(message);
+      if (!m || m[2].toLowerCase() !== addr.toLowerCase() || typeof signature !== 'string') return send(res, 400, { error: 'Bad message' });
+      const host = m[1].toLowerCase(), local = TEST_MODE && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host);
+      if (!(SITE_HOSTS.includes(host) || local) || m[3] !== (local ? 'http://' : 'https://') + host || Number(m[4]) !== CHAIN.id) return send(res, 400, { error: 'This sign-in message is not for halbrook.xyz' });
+      const issued = Date.parse(m[6]); if (!(Math.abs(Date.now() - issued) < 10 * 60_000)) return send(res, 400, { error: 'Sign-in message expired, try again' });
+      const nonce = m[5];
       const { rowCount } = await db.query("DELETE FROM nonces WHERE nonce = $1 AND created > now() - interval '10 minutes'", [nonce]);
       if (!rowCount) return send(res, 400, { error: 'Nonce expired, try again' });
       const ok = await verifyMessage({ address: addr, message, signature }).catch(() => false);
@@ -613,7 +641,7 @@ async function api(req, res, p) {
       if (ADMIN_TOKEN.length < 24 || t.length !== k.length || !crypto.timingSafeEqual(t, k)) return send(res, 401, { error: 'Not allowed' });
       if (p === '/api/admin/solvency' && req.method === 'GET') return send(res, 200, await solvency(true));
       if (p === '/api/admin/withdrawals' && req.method === 'GET') {
-        const { rows } = await db.query("SELECT id, address, amount, status, tx_hash, error, created FROM withdrawals WHERE status IN ('review', 'queued', 'sending', 'sent') ORDER BY id");
+        const { rows } = await db.query("SELECT id, address, amount, status, tx_hash, error, created FROM withdrawals WHERE status IN ('review', 'queued', 'sending', 'sent', 'unknown') ORDER BY id");
         return send(res, 200, { withdrawals: rows.map(w => ({ ...w, id: String(w.id), usdg: Number(w.amount) / 1e6 })) });
       }
       const m = /^\/api\/admin\/withdrawals\/(\d{1,18})\/(approve|reject)$/.exec(p);
@@ -744,14 +772,14 @@ async function api(req, res, p) {
       const k = (await marks(await premiums()))[model];
       if (!k || !k.ready) return send(res, 503, { error: 'The mark price for this model is still warming up. Try again in a few minutes.' });
       const entry = entryPx(side, k), worst = posWorst({ model, side, margin: m, size, entry });
-      if (LIVE) {   // the reserves must already cover this position's biggest possible gain
-        const s = await solvency(true);
-        if (!s.ok || s.levHeadroom == null || s.levHeadroom * 1e6 < worst - m) return send(res, 503, { error: 'Leverage is full for now: the reserves cover no more open positions. Try a smaller one later.' });
-      }
       const c = await db.connect();
       try {
         await c.query('BEGIN');
-        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['lev:' + model + ':' + side]);
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['lev-open']);   // one open at a time, so the reserves check below cannot be raced
+        if (LIVE) {   // the reserves must already cover this position's biggest possible gain
+          const s = await solvency(true);
+          if (!s.ok || s.levHeadroom == null || s.levHeadroom * 1e6 < worst - m) { await c.query('ROLLBACK'); return send(res, 503, { error: 'Leverage is full for now: the reserves cover no more open positions. Try a smaller one later.' }); }
+        }
         const oi = await c.query("SELECT COALESCE(SUM(size), 0) AS s FROM positions WHERE status = 'open' AND model = $1 AND side = $2", [model, side]);
         if (Number(oi.rows[0].s) + size > LEV_OI_MAX * 1e6) { await c.query('ROLLBACK'); return send(res, 400, { error: `This market is full on the ${side} side for now. Try a smaller size.` }); }
         const b = await c.query('SELECT amount FROM balances WHERE address = $1 AND model = $2 FOR UPDATE', [user, USDG]);
@@ -873,6 +901,9 @@ async function v1(req, res, p) {
     if (!OR_KEY) return oaErr(res, 503, 'Routing is not switched on yet', 'server_error');
     if (overLimit('v1:' + keyId, 60, 60_000)) return oaErr(res, 429, 'Rate limit: 60 requests per minute per key', 'rate_limit_error');
     if ((inflight.get(user) || 0) >= 4) return oaErr(res, 429, 'Four requests at a time per account', 'rate_limit_error');
+    inflight.set(user, (inflight.get(user) || 0) + 1);
+    let freed = false; const done = () => { if (freed) return; freed = true; const n = (inflight.get(user) || 1) - 1; if (n > 0) inflight.set(user, n); else inflight.delete(user); };
+    try {
     const b = await readJSON(req, 1024 * 1024);
     const model = modelId(b.model); if (!model) return oaErr(res, 400, 'Unknown model. GET /v1/models lists them.');
     if (!Array.isArray(b.messages) || !b.messages.length || b.messages.length > 200) return oaErr(res, 400, 'messages must be a non-empty array (200 at most)');
@@ -893,8 +924,6 @@ async function v1(req, res, p) {
     }
     const hold = await reserve(user, model, { messages, tools: body.tools }, maxOut);
     if (hold.error) return oaErr(res, hold.code, hold.error, hold.code === 402 ? 'insufficient_quota' : 'invalid_request_error');
-    inflight.set(user, (inflight.get(user) || 0) + 1);
-    const done = () => { const n = (inflight.get(user) || 1) - 1; if (n > 0) inflight.set(user, n); else inflight.delete(user); };
     try {
       let r; try { r = await upstream(body, !!b.stream); } catch (e) { await release(hold); return oaErr(res, 502, 'The model did not answer. Try again.', 'server_error'); }
       if (!r.ok) { const j = await r.json().catch(() => ({})); await release(hold); console.error('v1 upstream', r.status, j.error && j.error.message); return oaErr(res, r.status === 400 ? 400 : 502, r.status === 400 ? 'The model rejected this request' : 'The model did not answer. Try again.', r.status === 400 ? 'invalid_request_error' : 'server_error'); }
@@ -921,6 +950,7 @@ async function v1(req, res, p) {
       } catch (e) { console.error('v1 stream', e.message); }
       await settle(hold, usage || { prompt_tokens: Math.ceil(JSON.stringify(messages).length / 3), completion_tokens: maxOut }, provider, { via: 'api', key: keyId, stream: true });
       if (!res.destroyed) res.end();
+    } finally { done(); }
     } finally { done(); }
   } catch (e) {
     if (e.code === 413) return oaErr(res, 413, 'Request too large (1 MB at most)');
