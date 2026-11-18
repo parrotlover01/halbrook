@@ -433,6 +433,7 @@ async function balances(address) {
      so pushing the price yourself never pays;
    - a position can only open if the reserves already cover its biggest possible gain (the band caps it);
    - open size is capped per model and side, margin is capped per position, and losses never go below zero. */
+const chartCache = new Map();   // /api/chart answers, kept 30 s
 const levPx = (model, prem) => { const P = priceOf(model); return P ? P.blend * (1 + (prem[model] || 0)) : null; };
 async function marks(prem) {
   const { rows } = await db.query(`SELECT model, AVG(price) AS avg, COUNT(*)::int AS n FROM price_ticks WHERE ts > now() - make_interval(mins => $1) GROUP BY model`, [LEV_TWAP_MIN]);
@@ -526,6 +527,43 @@ async function api(req, res, p) {
       return send(res, 200, { live: true, chain: CHAIN.name, explorer: CHAIN.explorer, usdgContract: USDG_CONTRACT, treasury: TREASURY,
         held: d.held, owed: d.owed, owedAtMarket: d.owedAtMarket, owedAtReference: d.owedAtReference, pendingWithdrawals: d.pendingWithdrawals,
         margin: d.margin, ratio: d.owed > 0 ? d.held / d.owed : null, ok: d.ok, byAsset: d.byAsset.map(({ asset, name, usd }) => ({ asset, name, usd })), checked: d.checked });
+    }
+
+    // price history of one model, in USDG per million tokens. Rebuilt exactly from the ledger: the market price only
+    // moves on a swap (premium) or on a host price change (reference), and both are recorded with their before/after.
+    if (p === '/api/chart' && req.method === 'GET') {
+      if (overLimit('chart:' + ipOf(req), 120, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      const u = new URL(req.url, 'http://x'), model = u.searchParams.get('model'), range = u.searchParams.get('range') || '1w';
+      const SPAN = { '1d': 864e5, '1w': 7 * 864e5, '1m': 30 * 864e5, all: null };
+      if (!priceOf(model) || !(range in SPAN)) return send(res, 400, { error: 'Bad model or range' });
+      const key = model + ':' + range, hit = chartCache.get(key);
+      if (hit && Date.now() - hit.at < 30_000) return send(res, 200, hit.data);
+      const since = (await db.query("SELECT value FROM settings WHERE key = 'live_since'")).rows[0];
+      const t0 = since ? new Date(since.value).getTime() : 0;
+      const { rows } = await db.query(`SELECT ts, kind, model, meta FROM ledger WHERE ts >= to_timestamp($2 / 1000.0) AND (
+          (kind = 'swap' AND (model = $1 OR meta->>'to' = $1)) OR (kind = 'reprice' AND model = $1)) ORDER BY id`, [model, t0]);
+      // reference at any time: walking back from today, each reprice tells what it was before
+      const reps = rows.filter(r => r.kind === 'reprice'), refAt = t => { const n = reps.find(r => new Date(r.ts).getTime() > t); return n ? Number(n.meta.refFrom) : priceOf(model).blend; };
+      const now = Date.now(), start = SPAN[range] ? Math.max(t0, now - SPAN[range]) : t0;
+      let prem = 0, ref = refAt(t0); const pts = [];   // walk every event in order
+      for (const r of rows) {
+        const t = new Date(r.ts).getTime(), m = r.meta || {};
+        if (r.kind === 'reprice') { prem = Number(m.premTo); ref = Number(m.refTo); }
+        else if (r.model === model && Array.isArray(m.premFrom)) prem = Number(m.premFrom[1]);
+        else if (Array.isArray(m.premTo)) prem = Number(m.premTo[1]);
+        else continue;
+        if (t < start) continue;   // only the last state before the window counts
+        pts.push([t, ref * (1 + prem) * 1e6, ref * 1e6]);
+      }
+      const before = rows.filter(r => new Date(r.ts).getTime() < start);   // the window opens at the state the last of these left
+      const first = (() => { let pr = 0, rf = refAt(t0); for (const r of before) { const m = r.meta || {};
+        if (r.kind === 'reprice') { pr = Number(m.premTo); rf = Number(m.refTo); } else if (r.model === model && Array.isArray(m.premFrom)) pr = Number(m.premFrom[1]); else if (Array.isArray(m.premTo)) pr = Number(m.premTo[1]); }
+        return [start, rf * (1 + pr) * 1e6, rf * 1e6]; })();
+      const live = await premiums(), cur = [now, levPx(model, live) * 1e6, priceOf(model).blend * 1e6];
+      let series = [first, ...pts, cur];
+      if (series.length > 800) { const step = series.length / 800; series = Array.from({ length: 800 }, (_, i) => series[Math.min(series.length - 1, Math.round(i * step))]).concat([cur]); }
+      const data = { model, name: priceOf(model).name, range, from: start, to: now, trades: pts.length, points: series.map(([t, px, rf]) => [t, +px.toFixed(6), +rf.toFixed(6)]) };
+      chartCache.set(key, { at: Date.now(), data }); return send(res, 200, data);
     }
 
     if (p === '/api/leverage' && req.method === 'GET') {

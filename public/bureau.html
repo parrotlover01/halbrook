@@ -1038,6 +1038,32 @@ html[data-theme="light"] .lv-sum b,html[data-theme="light"] .lv-p b{color:#12111
 html[data-theme="light"] .lv-p{background:rgba(22,20,26,.032);box-shadow:inset 0 0 0 1px rgba(22,20,26,.063)}
 html[data-theme="light"] .lv-p button{border-color:rgba(22,20,26,.2);color:#121115}
 html[data-theme="light"] .lv-p .up{color:#1d7a4c}html[data-theme="light"] .lv-p .dn{color:#c21d31}
+
+/* price chart (TradingView-like, stripped down) */
+.tv{margin:-2px 0 2px}
+.tv-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.tv-chg{font:500 12px/1 var(--m);color:var(--muted);white-space:nowrap}@media (max-width:480px){.tv-chg .tv-n{display:none}}.tv-chg b{font-weight:500}.tv-chg .up{color:#5fd39a}.tv-chg .dn{color:#ff7a88}
+.tv-r{display:flex;gap:2px}
+.tv-r button{padding:5px 8px;border:0;border-radius:6px;background:none;color:var(--muted);font:500 11.5px/1 var(--m);cursor:pointer}
+.tv-r button:hover{color:#fff}.tv-r button.on{background:rgba(255,255,255,.08);color:#fff}
+.tv-plot{position:relative;height:150px;touch-action:pan-y}
+.tv-plot svg{display:block;width:100%;height:100%;overflow:visible}
+.tv-ax{font:500 10px var(--m);fill:#7d7986}
+.tv-grid{stroke:rgba(255,255,255,.05)}
+.tv-ref{stroke:rgba(255,255,255,.28);stroke-dasharray:3 4}
+.tv-reft{font:600 9.5px var(--m);fill:#8f8b98;letter-spacing:.08em}.tv-refb{fill:none;stroke:rgba(255,255,255,.22);stroke-dasharray:3 3}html[data-theme="light"] .tv-refb{stroke:rgba(22,20,26,.28)}
+.tv-x{stroke:rgba(255,255,255,.25);stroke-dasharray:2 3}
+.tv-tip{position:absolute;top:-4px;padding:5px 8px;border-radius:7px;background:rgba(14,14,18,.92);box-shadow:0 0 0 1px rgba(255,255,255,.1);color:#fff;font:500 11px/1.25 var(--m);white-space:nowrap;pointer-events:none;transform:translateX(-50%)}
+.tv-tip small{display:block;color:#8f8b98;font-size:10px}
+.tv-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font:400 12px var(--b)}
+html[data-theme="light"] .tv-r button:hover,html[data-theme="light"] .tv-r button.on{color:#121115}
+html[data-theme="light"] .tv-r button.on{background:rgba(22,20,26,.07)}
+html[data-theme="light"] .tv-grid{stroke:rgba(22,20,26,.06)}
+html[data-theme="light"] .tv-ref{stroke:rgba(22,20,26,.3)}
+html[data-theme="light"] .tv-x{stroke:rgba(22,20,26,.3)}
+html[data-theme="light"] .tv-ax,html[data-theme="light"] .tv-reft{fill:#6c6876}
+html[data-theme="light"] .tv-tip{background:#fff;color:#121115;box-shadow:0 0 0 1px rgba(22,20,26,.1),0 8px 18px -8px rgba(60,45,30,.4)}
+html[data-theme="light"] .tv-chg .up{color:#1d7a4c}html[data-theme="light"] .tv-chg .dn{color:#c21d31}
 </style>
 </head>
 <body>
@@ -1091,6 +1117,7 @@ html[data-theme="light"] .lv-p .up{color:#1d7a4c}html[data-theme="light"] .lv-p 
     </div>
     <aside class="tx-card" aria-label="Trade">
       <div id="mkSide" aria-live="polite"></div>
+      <div class="tv" id="tv"><div class="tv-top"><span class="tv-chg" id="tvChg"></span><div class="tv-r" id="tvR" role="group" aria-label="Chart range"><button type="button" data-r="1d">1D</button><button type="button" data-r="1w" class="on">1W</button><button type="button" data-r="1m">1M</button><button type="button" data-r="all">All</button></div></div><div class="tv-plot" id="tvPlot"></div></div>
       <div class="tx-tabs" id="txTabs" role="tablist" hidden><button type="button" role="tab" data-t="swap" class="on" aria-selected="true">Swap</button><button type="button" role="tab" data-t="lev" aria-selected="false">Leverage<small>NEW</small></button></div>
       <div class="tx-swap">
         <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="text" value="1M" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Amount, for example 1M, 500K or 10"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" class="tp-src" aria-label="From model"></select><button type="button" class="tp-btn" id="swFromBtn" aria-haspopup="listbox"></button></div></div>
@@ -1466,7 +1493,7 @@ function render() {
       ${h.length ? h.slice(0, 5).map((x, i) => `<div class="ob-r ${i === 0 ? 'ob-b best' : 'ob-n'}" style="--w:${Math.max(8, x.p / maxP * 100)}%"><span>${x.name}${x.tier ? `<em class="t-${x.tier}">${{ flex: 'Flex · slower', fast: 'Fast', ultrafast: 'Ultra-fast', priority: 'Priority' }[x.tier]}</em>` : (x.q && x.q !== 'unknown' ? `<em>${x.q}</em>` : '')}</span><span>${usd(x.p)}</span><span>${((x.p - m.ref) / m.ref * 100).toFixed(0)}%</span></div>`).join('') : '<p class="sub">Loading hosts…</p>'}
     </div>
     <dl class="spec"><dt>Input</dt><dd>${usd(m.inP)} / M</dd><dt>Output</dt><dd>${usd(m.outP)} / M</dd><dt>Context</dt><dd>${fmtK(m.ctx)} tokens</dd>${m.maxOut ? `<dt>Max output</dt><dd>${fmtK(m.maxOut)} tokens</dd>` : ''}<dt>Reads</dt><dd>${m.mod || 'text'}</dd><dt>Reasoning</dt><dd>${m.reason ? 'yes' : 'no'}</dd></dl>`;
-  renderSwap(); if (typeof renderLev === 'function') renderLev();
+  renderSwap(); if (typeof renderLev === 'function') renderLev(); if (typeof renderChart === 'function') renderChart();
 }
 /* swap: live price ratio between two models (demo until balances are live) */
 function fillSelects() {
@@ -1638,6 +1665,55 @@ $('lvGo').addEventListener('click', async () => {
   lvMsg(`Opened: ${lvSide} ${esc(nameOf(sel))} x${lvX} with ${usd2(margin)} of margin.`); me.balances = r.balances; renderAcct(); loadLev();
 });
 loadLev(); setInterval(() => { if (lev && lev.enabled) loadLev(); }, 30_000);
+/* ---------- price chart: market price vs USDG, rebuilt from every trade ---------- */
+let tvRange = 'all', tvData = null, tvKey = '', tvAt = 0;
+try { tvRange = localStorage.getItem('hb-tv') || '1w'; } catch (e) { tvRange = '1w'; }
+async function renderChart(force) {
+  const key = sel + ':' + tvRange;
+  $('tvR').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.r === tvRange));
+  if (force || key !== tvKey || Date.now() - tvAt > 60_000) {
+    tvKey = key; tvAt = Date.now();
+    try { const r = await fetch(`/api/chart?model=${encodeURIComponent(sel)}&range=${tvRange}`); if (!r.ok) return; const d = await r.json(); if (tvKey !== key) return; tvData = d; } catch (e) { return; }
+  }
+  drawChart();
+}
+$('tvR').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; tvRange = b.dataset.r; try { localStorage.setItem('hb-tv', tvRange); } catch (x) {} renderChart(true); });
+function drawChart() {
+  const el = $('tvPlot'), d = tvData; if (!d || !el) return;
+  const W = el.clientWidth || 320, H = el.clientHeight || 150, R = 52, T = 8, Bm = 18, pw = W - R, ph = H - T - Bm;
+  const P = d.points; if (P.length < 2) { el.innerHTML = '<div class="tv-empty">No trades yet</div>'; $('tvChg').textContent = ''; return; }
+  const t0 = d.from, t1 = d.to, px = P.map(p => p[1]), rf = P.map(p => p[2]);
+  let lo = Math.min(...px, ...rf), hi = Math.max(...px, ...rf); const pad = Math.max((hi - lo) * 0.12, hi * 0.004); lo -= pad; hi += pad;
+  const X = t => (t - t0) / Math.max(1, t1 - t0) * pw, Y = v => T + (hi - v) / (hi - lo) * ph;
+  // step line: a price holds until the next trade
+  let path = `M${X(P[0][0]).toFixed(1)},${Y(P[0][1]).toFixed(1)}`;
+  for (let i = 1; i < P.length; i++) path += `H${X(P[i][0]).toFixed(1)}V${Y(P[i][1]).toFixed(1)}`;
+  const first = P[0][1], last = P[P.length - 1][1], up = last >= first, col = up ? '#3ccf8e' : '#ef5a6f', chg = (last - first) / first * 100;
+  const area = path + `H${X(t1).toFixed(1)}V${T + ph}H${X(P[0][0]).toFixed(1)}Z`;
+  const fmt = v => '$' + (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(2) : v.toFixed(3));
+  const fmtA = v => '$' + (v >= 100 ? v.toFixed(0) : v.toFixed(2));
+  const ticks = [hi - pad, (hi + lo) / 2, lo + pad];
+  const span = t1 - t0, tf = t => { const z = new Date(t); return span <= 1.5 * 864e5 ? z.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : z.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+  const refY = Y(rf[rf.length - 1]);
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="${esc(d.name)} price chart">
+    <defs><linearGradient id="tvG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    ${ticks.map(v => `<line class="tv-grid" x1="0" x2="${pw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/>${Math.abs(Y(v) - refY) < 16 || Math.abs(Y(v) - Y(last)) < 16 ? '' : `<text class="tv-ax" x="${pw + 8}" y="${(Y(v) + 3.5).toFixed(1)}">${fmtA(v)}</text>`}`).join('')}
+    <line class="tv-ref" x1="0" x2="${pw}" y1="${refY.toFixed(1)}" y2="${refY.toFixed(1)}"/>${Math.abs(refY - Y(last)) < 18 ? '' : `<rect class="tv-refb" x="${pw + 2}" y="${(refY - 9).toFixed(1)}" width="${R - 4}" height="18" rx="4"/><text class="tv-reft" x="${pw + 2 + (R - 4) / 2}" y="${(refY + 3.4).toFixed(1)}" text-anchor="middle">REF</text>`}
+    <path d="${area}" fill="url(#tvG)"/><path d="${path}H${X(t1).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="${X(t1).toFixed(1)}" cy="${Y(last).toFixed(1)}" r="3.2" fill="${col}"/>
+    <rect x="${pw + 2}" y="${(Y(last) - 9).toFixed(1)}" width="${R - 4}" height="18" rx="4" fill="${col}"/><text x="${pw + 2 + (R - 4) / 2}" y="${(Y(last) + 3.6).toFixed(1)}" text-anchor="middle" style="font:600 10px var(--m);fill:#06120c">${fmt(last)}</text>
+    <text class="tv-ax" x="0" y="${H - 3}">${tf(t0)}</text><text class="tv-ax" x="${pw}" y="${H - 3}" text-anchor="end">${tf(t1)}</text>
+    <g id="tvX" style="display:none"><line class="tv-x" id="tvXl" y1="${T}" y2="${T + ph}"/><circle id="tvXc" r="3.6" fill="${col}" stroke="var(--bg,#000)" stroke-width="1.5"/></g></svg><div class="tv-tip" id="tvTip" hidden></div>`;
+  $('tvChg').innerHTML = `<b class="${up ? 'up' : 'dn'}">${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(2)}%</b><span class="tv-n"> · ${d.trades} trade${d.trades === 1 ? '' : 's'}</span>`;
+  const svg = el.querySelector('svg'), g = $('tvX'), tip = $('tvTip');
+  const move = e => { const r = svg.getBoundingClientRect(), x = Math.max(0, Math.min(pw, (e.clientX - r.left) * W / r.width)), t = t0 + x / pw * (t1 - t0);
+    let k = 0; for (let i = 0; i < P.length; i++) if (P[i][0] <= t) k = i;
+    const v = P[k][1], y = Y(v); g.style.display = ''; $('tvXl').setAttribute('x1', x); $('tvXl').setAttribute('x2', x); $('tvXc').setAttribute('cx', x); $('tvXc').setAttribute('cy', y);
+    tip.hidden = false; tip.style.left = Math.max(48, Math.min(r.width - 48, x * r.width / W)) + 'px';
+    tip.innerHTML = `${fmt(v)} / M<small>${new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>`; };
+  svg.onpointermove = move; svg.onpointerdown = move; svg.onpointerleave = () => { g.style.display = 'none'; tip.hidden = true; };
+}
+addEventListener('resize', () => { clearTimeout(drawChart.t); drawChart.t = setTimeout(drawChart, 150); });
 /* ---------- chat ---------- */
 const thread = [];   // one conversation for every model: switch models and it follows
 let memNotes = null;
