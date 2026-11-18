@@ -1122,7 +1122,7 @@ html[data-theme="light"] .tvb-px .up{color:#1d7a4c}html[data-theme="light"] .tvb
 </div></div>
 
 <section id="market"><div class="wrap">
-  <div class="mk-hero"><h1 class="mk-kicker"><img class="mk-bird" src="assets/bureau/mark.png" alt="">Token exchange</h1><p class="slogan" aria-label="The true cost of AI, in plain sight."><span style="--i:0">The</span> <span style="--i:1">true</span> <span style="--i:2">cost</span> <span style="--i:3">of</span> <span style="--i:4">AI,</span> <span style="--i:5">in</span> <span style="--i:6">plain</span> <span style="--i:7">sight.</span> </p><span class="hiw-row"><button class="hiw-btn" id="hiwBtn2" type="button" data-src="assets/bureau/exchange-works-3.mp4" data-poster="assets/bureau/exchange-works-3.jpg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>How the exchange works</button></span><span id="mkStatus" hidden></span></div>
+  <div class="mk-hero"><h1 class="mk-kicker"><img class="mk-bird" src="assets/bureau/mark.png" alt="">Token exchange</h1><p class="slogan" aria-label="The true cost of AI, in plain sight."><span style="--i:0">The</span> <span style="--i:1">true</span> <span style="--i:2">cost</span> <span style="--i:3">of</span> <span style="--i:4">AI,</span> <span style="--i:5">in</span> <span style="--i:6">plain</span> <span style="--i:7">sight.</span> </p><span class="hiw-row"><button class="hiw-btn" id="hiwBtn2" type="button" data-src="assets/bureau/exchange-works-4.mp4" data-poster="assets/bureau/exchange-works-4.jpg"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>How the exchange works</button></span><span id="mkStatus" hidden></span></div>
 
   <div id="tape" hidden></div>
   <div class="acct" id="acct"></div>
@@ -1338,7 +1338,7 @@ function renderAcct() {
     const total = me.balances.reduce((a, b) => a + (b.usd || 0), 0);
     el.innerHTML = `<div class="acct-tot"><span>Your balance</span><b>$${total.toFixed(2)}</b></div>
       <div class="acct-chips">${me.balances.length ? me.balances.map(b => b.model === 'usdg' ? `<span class="chip-b chip-usd">USDG <b>$${(b.tokens / 1e6).toFixed(2)}</b></span>` : `<span class="chip-b">${esc(nameOf(b.model))} <b>${fmtTok(b.tokens)}</b></span>`).join('') : '<span class="acct-t">No tokens yet.</span>'}</div>
-      <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button><button class="acct-b acct-ghost" id="acctKeys" type="button">API key</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? '' : 'Test mode · real USDG at launch'}</span>`;
+      <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? '' : 'Test mode · real USDG at launch'}</span>`;
   }
   const go = $('acctGo'); if (go) go.onclick = () => (account ? signIn() : connectWallet().then(a => a && signIn()));
   const kb = $('acctKeys'); if (kb) kb.onclick = openKeys;
@@ -2064,6 +2064,6 @@ curl https://www.halbrook.xyz/v1/chat/completions \
   -d '{"model":"claude-opus-5.5",
        "messages":[{"role":"user","content":"Hello"}]}'</pre>
 </div></div>
-<div class="hiw" id="hiw" hidden role="dialog" aria-label="How it works"><div class="hiw-box"><button class="hiw-x" id="hiwX" type="button" aria-label="Close">×</button><video id="hiwVid" src="assets/bureau/exchange-works-3.mp4" poster="assets/bureau/exchange-works-3.jpg" controls playsinline preload="none"></video></div></div>
+<div class="hiw" id="hiw" hidden role="dialog" aria-label="How it works"><div class="hiw-box"><button class="hiw-x" id="hiwX" type="button" aria-label="Close">×</button><video id="hiwVid" src="assets/bureau/exchange-works-4.mp4" poster="assets/bureau/exchange-works-4.jpg" controls playsinline preload="none"></video></div></div>
 </body>
 </html>
