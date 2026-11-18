@@ -1081,6 +1081,13 @@ html[data-theme="light"] .tvb-back{background:rgba(22,20,26,.06);color:#37363a}h
 html[data-theme="light"] .tvb-head h2,html[data-theme="light"] .tvb-px>b,html[data-theme="light"] .tvb-stats b{color:#121115}
 html[data-theme="light"] .tvb-stats{background:rgba(22,20,26,.07)}html[data-theme="light"] .tvb-stats div{background:#f6f4f0}
 html[data-theme="light"] .tvb-px .up{color:#1d7a4c}html[data-theme="light"] .tvb-px .dn{color:#c21d31}
+
+/* balance chips: model icon + smaller */
+.acct-chips .chip-b{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;font-size:12px;line-height:1}
+.acct-chips .chip-b b{margin-left:2px;font-size:12px}
+.acct-chips .chip-b .brand,.acct-chips .chip-b .usd{width:20px;height:20px;flex:none;border-radius:50%;display:grid;place-items:center}
+.acct-chips .chip-b .brand img{width:11px;height:11px}
+.acct-chips .chip-b .usd{background:linear-gradient(180deg,#1f6f4a,#0e3a27);color:#bff5d8;font:600 11px/1 var(--b)}
 </style>
 </head>
 <body>
@@ -1337,7 +1344,7 @@ function renderAcct() {
   else {
     const total = me.balances.reduce((a, b) => a + (b.usd || 0), 0);
     el.innerHTML = `<div class="acct-tot"><span>Your balance</span><b>$${total.toFixed(2)}</b></div>
-      <div class="acct-chips">${me.balances.length ? me.balances.map(b => b.model === 'usdg' ? `<span class="chip-b chip-usd">USDG <b>$${(b.tokens / 1e6).toFixed(2)}</b></span>` : `<span class="chip-b">${esc(nameOf(b.model))} <b>${fmtTok(b.tokens)}</b></span>`).join('') : '<span class="acct-t">No tokens yet.</span>'}</div>
+      <div class="acct-chips">${me.balances.length ? me.balances.map(b => b.model === 'usdg' ? `<span class="chip-b chip-usd">${tpIco('usdg')}USDG <b>$${(b.tokens / 1e6).toFixed(2)}</b></span>` : `<span class="chip-b">${tpIco(b.model)}${esc(nameOf(b.model))} <b>${fmtTok(b.tokens)}</b></span>`).join('') : '<span class="acct-t">No tokens yet.</span>'}</div>
       <button class="acct-b acct-dep" id="acctDep" type="button">Deposit</button><button class="acct-b acct-ghost" id="acctWd" type="button">Withdraw</button>${cfg.testMode && !me.faucetUsed ? '<button class="acct-b" id="acctFaucet">Get $2 test credit</button>' : ''}<span class="acct-msg" id="acctMsg">${cfg.funds && cfg.funds.live ? '' : 'Test mode · real USDG at launch'}</span>`;
   }
   const go = $('acctGo'); if (go) go.onclick = () => (account ? signIn() : connectWallet().then(a => a && signIn()));
