@@ -38,7 +38,15 @@ const BAND = 0.30;                                                       // prem
 const DEPTH_USD = Number(process.env.MARKET_DEPTH_USD || 10);           // USD of net flow that moves a premium by 10 points
 const HALF_LIFE_H = Number(process.env.MARKET_HALF_LIFE_H || 0);        // 0 = premiums never fade on their own: a pure player-vs-player market
 const WD_FEE = Number(process.env.WITHDRAW_FEE_USD || 0.5);
-const API_ON = process.env.API_ENABLED === '1';                          // the public API (/v1 and API keys) is off until a later update             // flat fee per withdrawal, covers gas
+const API_ON = process.env.API_ENABLED === '1';
+// leverage: off unless LEVERAGE_ENABLED=1 (see the leverage block below)
+const LEV_ON = process.env.LEVERAGE_ENABLED === '1';
+const LEV_MIN = 2, LEV_MAX = Math.min(5, Math.max(LEV_MIN, Number(process.env.LEVERAGE_MAX || 5)));
+const LEV_MARGIN_MAX = Number(process.env.LEVERAGE_MARGIN_MAX_USD || 20);   // USDG of margin per position, at most
+const LEV_OI_MAX = Number(process.env.LEVERAGE_OI_MAX_USD || 100);          // open size per model and side, USD
+const LEV_TWAP_MIN = Number(process.env.LEVERAGE_TWAP_MIN || 15);           // mark price: average market price over this many minutes
+const LEV_FEE_H = Number(process.env.LEVERAGE_FEE_HOURLY || 0.0001);        // holding fee per hour, share of the size (0.01%)
+const LEV_MAINT = 0.10;                                                     // liquidated once worth 10% of the margin or less                          // the public API (/v1 and API keys) is off until a later update             // flat fee per withdrawal, covers gas
 
 const db = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL, max: 5 }) : null;
 
@@ -61,6 +69,11 @@ async function migrate() {
     CREATE TABLE IF NOT EXISTS memories (id bigserial PRIMARY KEY, address text NOT NULL, data text NOT NULL, created timestamptz NOT NULL DEFAULT now());
     CREATE INDEX IF NOT EXISTS memories_addr ON memories (address, created);
     CREATE TABLE IF NOT EXISTS market (model text PRIMARY KEY, premium numeric NOT NULL DEFAULT 0, updated timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE IF NOT EXISTS price_ticks (model text NOT NULL, ts timestamptz NOT NULL DEFAULT now(), price numeric NOT NULL);
+    CREATE INDEX IF NOT EXISTS price_ticks_m ON price_ticks (model, ts DESC);
+    CREATE TABLE IF NOT EXISTS positions (id bigserial PRIMARY KEY, address text NOT NULL, model text NOT NULL, side text NOT NULL, margin numeric NOT NULL, leverage numeric NOT NULL, size numeric NOT NULL, entry numeric NOT NULL, fee_open numeric NOT NULL DEFAULT 0, status text NOT NULL DEFAULT 'open', opened timestamptz NOT NULL DEFAULT now(), closed timestamptz, exit numeric, payout numeric);
+    CREATE INDEX IF NOT EXISTS positions_addr ON positions (address, opened DESC);
+    CREATE INDEX IF NOT EXISTS positions_open ON positions (model, side) WHERE status = 'open';
   `);
   await db.query('ALTER TABLE market ADD COLUMN IF NOT EXISTS ref numeric; ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS fee numeric NOT NULL DEFAULT 0');
   // repair: no NaN or negative balances, no balances in unknown models; then forbid them for good
@@ -331,6 +344,13 @@ async function solvency(force = false) {
     atMarket += n * P.blend * (1 + p); atRef += n * P.blend; if (r.model === USDG) usdgOwed += n / 1e6;
     const q = r.model === USDG ? null : quote(r.model, USDG, n, prem), v = r.model === USDG ? n / 1e6 : Math.max(q ? q.out / 1e6 : 0, n * P.blend);
     owed += v; byAsset.push({ asset: r.model, name: r.model === USDG ? 'USDG' : P.name, units: n, usd: v }); }
+  // open leveraged positions: owed at what their holders could close them for now (never less than the margin
+  // while the mark is warming up); their worst case, at the band edge, is kept apart to gate new positions
+  let levOwed = 0, levWorst = 0;
+  const pos = (await db.query("SELECT * FROM positions WHERE status = 'open'")).rows;
+  if (pos.length) { const k = await marks(prem);
+    for (const x of pos) { const mk = k[x.model]; levOwed += (mk && mk.ready ? posValue(x, exitPx(x.side, mk)).value : Number(x.margin)) / 1e6; levWorst += posWorst(x) / 1e6; }
+    owed += levOwed; atMarket += levOwed; atRef += levOwed; byAsset.push({ asset: 'leverage', name: 'Leveraged positions', units: pos.length, usd: levOwed }); }
   let held = null, hotAddr = null, hotUsdg = null, treasuryUsdg = null, hotEth = null;
   if (LIVE) {
     const read = async a => Number(BigInt(await rpc('eth_call', [{ to: USDG_CONTRACT, data: '0x70a08231' + a.slice(2).toLowerCase().padStart(64, '0') }, 'latest']))) / 1e6;
@@ -339,7 +359,7 @@ async function solvency(force = false) {
       if (hotAddr.toLowerCase() !== TREASURY.toLowerCase()) { hotUsdg = await read(hotAddr); held += hotUsdg; } else hotUsdg = treasuryUsdg;
       hotEth = Number(BigInt(await rpc('eth_getBalance', [hotAddr, 'latest']))) / 1e18; }
   }
-  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, hotWallet: hotAddr, hotUsdg, hotEth, owed, margin: held == null ? null : held - owed, ok: held == null || held >= owed - 1e-6, checked: new Date().toISOString() };
+  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, hotWallet: hotAddr, hotUsdg, hotEth, owed, levOwed, levWorst, levHeadroom: held == null ? null : held - (owed - levOwed) - levWorst, margin: held == null ? null : held - owed, ok: held == null || held >= owed - 1e-6, checked: new Date().toISOString() };
   if (!data.ok) console.error(`RESERVE ALERT: holds ${held.toFixed(2)} USDG, owes ${owed.toFixed(2)}. Withdrawals paused.`);
   solv = { at: Date.now(), data }; return data;
 }
@@ -402,12 +422,87 @@ async function balances(address) {
     return { model: r.model, tokens: n, usd: P ? n * P.blend * (1 + p) : null, usdRef: P ? n * P.blend : null }; });
 }
 
+/* ---------- leverage: isolated long / short positions on a model's market price, margin in USDG ----------
+   A position does not trade tokens and does not move the premium: it is a bet on the market price, and its
+   gains are paid by the treasury. So every rule protects the reserves first:
+   - the mark price is the average market price over the last LEVERAGE_TWAP_MIN minutes, so one big swap cannot
+     liquidate anyone, and you always get the worse of mark and live price when you open and when you close,
+     so pushing the price yourself never pays;
+   - a position can only open if the reserves already cover its biggest possible gain (the band caps it);
+   - open size is capped per model and side, margin is capped per position, and losses never go below zero. */
+const levPx = (model, prem) => { const P = priceOf(model); return P ? P.blend * (1 + (prem[model] || 0)) : null; };
+async function marks(prem) {
+  const { rows } = await db.query(`SELECT model, AVG(price) AS avg, COUNT(*)::int AS n FROM price_ticks WHERE ts > now() - make_interval(mins => $1) GROUP BY model`, [LEV_TWAP_MIN]);
+  const out = {};
+  for (const m of MODELS) { const spot = levPx(m, prem); if (spot == null) continue; const r = rows.find(x => x.model === m);
+    // ready once the window holds enough samples (about a third of it)
+    out[m] = { spot, mark: r ? Number(r.avg) : null, ready: !!r && r.n >= Math.max(3, Math.floor(LEV_TWAP_MIN / 3)) }; }
+  return out;
+}
+async function sampleTicks() {
+  if (!db) return;
+  try {
+    // turned off: keep pricing (and liquidating) only while positions are still open, so they can always be closed
+    if (!LEV_ON && !(await db.query("SELECT 1 FROM positions WHERE status = 'open' LIMIT 1")).rows.length) return;
+    const prem = await premiums(), m = MODELS.filter(x => priceOf(x));
+    if (m.length) await db.query('INSERT INTO price_ticks (model, price) SELECT unnest($1::text[]), unnest($2::numeric[])', [m, m.map(x => levPx(x, prem))]);
+    await db.query("DELETE FROM price_ticks WHERE ts < now() - interval '2 days'");
+    await liquidate();
+  } catch (e) { console.error('leverage tick', e.message); }
+}
+// value of a position (micro-USDG) if it closed at price px: margin + gain - closing fee - holding fee, never below zero
+function posValue(x, px) {
+  const size = Number(x.size), entry = Number(x.entry), m = Number(x.margin), hours = (Date.now() - new Date(x.opened).getTime()) / 36e5;
+  const gain = size * (x.side === 'long' ? px / entry - 1 : 1 - px / entry);
+  const fees = size * SWAP_FEE + size * LEV_FEE_H * hours;
+  return { gain, fees, value: Math.max(0, m + gain - fees) };
+}
+// price at which the mark liquidates the position (fees so far included)
+function liqPrice(x) {
+  const size = Number(x.size), entry = Number(x.entry), m = Number(x.margin), hours = (Date.now() - new Date(x.opened).getTime()) / 36e5;
+  const room = (m * (1 - LEV_MAINT) - size * SWAP_FEE - size * LEV_FEE_H * hours) / size;
+  return x.side === 'long' ? entry * (1 - room) : entry * (1 + room);
+}
+// worst case for the treasury: the most a position can be worth, with the price at the band edge in its favour
+function posWorst(x) {
+  const P = priceOf(x.model); if (!P) return Number(x.margin) + Number(x.size);
+  const edge = x.side === 'long' ? P.blend * (1 + BAND) : P.blend * (1 - BAND), entry = Number(x.entry), size = Number(x.size);
+  return Number(x.margin) + Math.max(0, size * (x.side === 'long' ? edge / entry - 1 : 1 - edge / entry));
+}
+const exitPx = (side, k) => side === 'long' ? Math.min(k.spot, k.mark) : Math.max(k.spot, k.mark);   // the worse one for the holder
+const entryPx = (side, k) => side === 'long' ? Math.max(k.spot, k.mark) : Math.min(k.spot, k.mark);
+async function liquidate() {
+  const open = (await db.query("SELECT * FROM positions WHERE status = 'open'")).rows; if (!open.length) return;
+  const k = await marks(await premiums());
+  for (const x of open) {
+    const mk = k[x.model]; if (!mk || !mk.ready) continue;
+    if (posValue(x, mk.mark).value > Number(x.margin) * LEV_MAINT) continue;
+    const c = await db.connect();
+    try {
+      await c.query('BEGIN');
+      const r = await c.query("UPDATE positions SET status = 'liquidated', closed = now(), exit = $2, payout = 0 WHERE id = $1 AND status = 'open'", [x.id, mk.mark]);
+      if (r.rowCount) await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'lev-liquidated',$2,0,$3)", [x.address, x.model, JSON.stringify({ id: String(x.id), mark: mk.mark })]);
+      await c.query('COMMIT');
+      if (r.rowCount) console.log('leverage: liquidated position', String(x.id), x.model, x.side);
+    } catch (e) { await c.query('ROLLBACK'); console.error('liquidate', e.message); } finally { c.release(); }
+  }
+}
+function posView(x, k) {
+  const P = priceOf(x.model), mk = k && k[x.model], open = x.status === 'open';
+  const now = open && mk && mk.ready ? posValue(x, exitPx(x.side, mk)) : null;
+  return { id: String(x.id), model: x.model, name: P ? P.name : x.model, side: x.side, leverage: Number(x.leverage), status: x.status,
+    margin: Number(x.margin) / 1e6, size: Number(x.size) / 1e6, entry: Number(x.entry) * 1e6, opened: x.opened, closed: x.closed,
+    mark: mk && mk.mark != null ? mk.mark * 1e6 : null, spot: mk ? mk.spot * 1e6 : null, liq: open ? liqPrice(x) * 1e6 : null,
+    value: now ? now.value / 1e6 : null, pnl: now ? (now.value - Number(x.margin)) / 1e6 : null,
+    exit: x.exit != null ? Number(x.exit) * 1e6 : null, payout: x.payout != null ? Number(x.payout) / 1e6 : null };
+}
+
 /* ---------- API ---------- */
 async function api(req, res, p) {
   if (!db) return send(res, 503, { error: 'Database not configured' });
   try {
     if (p === '/api/config' && req.method === 'GET')
-      return send(res, 200, { funds: { live: LIVE && liveReady, address: LIVE ? TREASURY : null, chainId: CHAIN.id, chainName: CHAIN.name, rpc: 'https://rpc.mainnet.chain.robinhood.com', explorer: CHAIN.explorer, usdg: USDG_CONTRACT, confirmations: CONFIRMATIONS, withdrawals: WD_ON, wdMax: WD_MAX, wdDaily: WD_DAILY, wdAuto: WD_AUTO, wdFee: WD_FEE }, testMode: TEST_MODE, chat: !!OR_KEY, margin: MARGIN, swapFee: SWAP_FEE, models: MODELS.filter(m => PRICES[m]).map(m => ({ id: m, name: PRICES[m].name, blendPerM: PRICES[m].blend * 1e6 })) });
+      return send(res, 200, { funds: { live: LIVE && liveReady, address: LIVE ? TREASURY : null, chainId: CHAIN.id, chainName: CHAIN.name, rpc: 'https://rpc.mainnet.chain.robinhood.com', explorer: CHAIN.explorer, usdg: USDG_CONTRACT, confirmations: CONFIRMATIONS, withdrawals: WD_ON, wdMax: WD_MAX, wdDaily: WD_DAILY, wdAuto: WD_AUTO, wdFee: WD_FEE }, testMode: TEST_MODE, chat: !!OR_KEY, margin: MARGIN, swapFee: SWAP_FEE, leverage: LEV_ON, models: MODELS.filter(m => PRICES[m]).map(m => ({ id: m, name: PRICES[m].name, blendPerM: PRICES[m].blend * 1e6 })) });
 
     if (p === '/api/market' && req.method === 'GET')
       return send(res, 200, { band: BAND, depthUsd: DEPTH_USD, halfLifeH: HALF_LIFE_H, swapFee: SWAP_FEE, models: marketView(await premiums()) });
@@ -428,6 +523,16 @@ async function api(req, res, p) {
       return send(res, 200, { live: true, chain: CHAIN.name, explorer: CHAIN.explorer, usdgContract: USDG_CONTRACT, treasury: TREASURY,
         held: d.held, owed: d.owed, owedAtMarket: d.owedAtMarket, owedAtReference: d.owedAtReference, pendingWithdrawals: d.pendingWithdrawals,
         margin: d.margin, ratio: d.owed > 0 ? d.held / d.owed : null, ok: d.ok, byAsset: d.byAsset.map(({ asset, name, usd }) => ({ asset, name, usd })), checked: d.checked });
+    }
+
+    if (p === '/api/leverage' && req.method === 'GET') {
+      if (overLimit('lev:' + ipOf(req), 120, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      const base = { enabled: LEV_ON, min: LEV_MIN, max: LEV_MAX, marginMax: LEV_MARGIN_MAX, oiMax: LEV_OI_MAX, twapMin: LEV_TWAP_MIN, feeHourly: LEV_FEE_H, openFee: SWAP_FEE, closeFee: SWAP_FEE, maintenance: LEV_MAINT, band: BAND };
+      if (!LEV_ON) return send(res, 200, base);
+      const prem = await premiums(), [k, oi] = await Promise.all([marks(prem), db.query("SELECT model, side, SUM(size) AS s FROM positions WHERE status = 'open' GROUP BY model, side")]);
+      const oiOf = (m, side) => Number((oi.rows.find(r => r.model === m && r.side === side) || {}).s || 0) / 1e6;
+      return send(res, 200, { ...base, markets: Object.entries(k).map(([id, x]) => ({ id, name: PRICES[id].name, spot: x.spot * 1e6, mark: x.mark == null ? null : x.mark * 1e6, ready: x.ready,
+        floor: PRICES[id].blend * (1 - BAND) * 1e6, cap: PRICES[id].blend * (1 + BAND) * 1e6, oiLong: oiOf(id, 'long'), oiShort: oiOf(id, 'short') })) });
     }
 
     if (p === '/api/nonce' && req.method === 'GET') {
@@ -565,6 +670,66 @@ async function api(req, res, p) {
         await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'swap',$2,$3,$4)", [user, from, -amt, meta]);
         await c.query('COMMIT');
         return send(res, 200, { gave: amt, got: q.out, quote: q, balances: await balances(user) });
+      } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+    }
+
+    /* leverage (see the leverage block): open, list, close */
+    if (p === '/api/positions' && req.method === 'GET') {
+      if (overLimit('pos:' + user, 60, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      const { rows } = await db.query("SELECT * FROM positions WHERE address = $1 AND (status = 'open' OR closed > now() - interval '7 days') ORDER BY opened DESC LIMIT 30", [user]);
+      const k = rows.some(x => x.status === 'open') ? await marks(await premiums()) : null;
+      return send(res, 200, { enabled: LEV_ON, positions: rows.map(x => posView(x, k)) });
+    }
+    if (p === '/api/positions' && req.method === 'POST') {
+      if (!LEV_ON) return send(res, 403, { error: 'Leverage is coming soon' });
+      if (LIVE && !liveReady) return send(res, 503, { error: 'Starting up, try again in a moment' });
+      if (throttled('posopen:' + user, 2000)) return send(res, 429, { error: 'Slow down a little' });
+      const { model, side, margin, leverage } = await readJSON(req);
+      const lev = Number(leverage), m = Math.round(Number(margin) * 1e6);
+      if (!priceOf(model)) return send(res, 400, { error: 'Pick a model' });
+      if (side !== 'long' && side !== 'short') return send(res, 400, { error: 'Pick long or short' });
+      if (!Number.isInteger(lev) || lev < LEV_MIN || lev > LEV_MAX) return send(res, 400, { error: `Leverage is x${LEV_MIN} to x${LEV_MAX}` });
+      if (!Number.isSafeInteger(m) || m < 1e6) return send(res, 400, { error: 'Put at least 1 USDG of margin' });
+      if (m > LEV_MARGIN_MAX * 1e6) return send(res, 400, { error: `${LEV_MARGIN_MAX} USDG of margin at most per position` });
+      const size = m * lev, feeOpen = Math.ceil(size * SWAP_FEE);
+      const k = (await marks(await premiums()))[model];
+      if (!k || !k.ready) return send(res, 503, { error: 'The mark price for this model is still warming up. Try again in a few minutes.' });
+      const entry = entryPx(side, k), worst = posWorst({ model, side, margin: m, size, entry });
+      if (LIVE) {   // the reserves must already cover this position's biggest possible gain
+        const s = await solvency(true);
+        if (!s.ok || s.levHeadroom == null || s.levHeadroom * 1e6 < worst - m) return send(res, 503, { error: 'Leverage is full for now: the reserves cover no more open positions. Try a smaller one later.' });
+      }
+      const c = await db.connect();
+      try {
+        await c.query('BEGIN');
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', ['lev:' + model + ':' + side]);
+        const oi = await c.query("SELECT COALESCE(SUM(size), 0) AS s FROM positions WHERE status = 'open' AND model = $1 AND side = $2", [model, side]);
+        if (Number(oi.rows[0].s) + size > LEV_OI_MAX * 1e6) { await c.query('ROLLBACK'); return send(res, 400, { error: `This market is full on the ${side} side for now. Try a smaller size.` }); }
+        const b = await c.query('SELECT amount FROM balances WHERE address = $1 AND model = $2 FOR UPDATE', [user, USDG]);
+        if (!b.rows.length || Number(b.rows[0].amount) < m + feeOpen) { await c.query('ROLLBACK'); return send(res, 400, { error: `Not enough USDG: you need ${((m + feeOpen) / 1e6).toFixed(2)} with the fee` }); }
+        await c.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2', [user, USDG, m + feeOpen]);
+        const ins = await c.query('INSERT INTO positions (address, model, side, margin, leverage, size, entry, fee_open) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [user, model, side, m, lev, size, entry, feeOpen]);
+        await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'lev-open',$2,$3,$4)", [user, USDG, -(m + feeOpen), JSON.stringify({ id: String(ins.rows[0].id), model, side, leverage: lev, size, entry, fee: feeOpen })]);
+        await c.query('COMMIT');
+        return send(res, 200, { position: posView(ins.rows[0], { [model]: k }), balances: await balances(user) });
+      } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+    }
+    const pc = /^\/api\/positions\/(\d{1,18})\/close$/.exec(p);
+    if (pc && req.method === 'POST') {
+      if (throttled('posclose:' + user, 1000)) return send(res, 429, { error: 'Slow down a little' });
+      const c = await db.connect();
+      try {
+        await c.query('BEGIN');
+        const { rows } = await c.query("SELECT * FROM positions WHERE id = $1 AND address = $2 AND status = 'open' FOR UPDATE", [pc[1], user]);
+        if (!rows.length) { await c.query('ROLLBACK'); return send(res, 404, { error: 'Position not found or already closed' }); }
+        const x = rows[0], k = (await marks(await premiums(c)))[x.model];
+        if (!k || !k.ready) { await c.query('ROLLBACK'); return send(res, 503, { error: 'The mark price is warming up. Try again in a few minutes.' }); }
+        const px = exitPx(x.side, k), v = posValue(x, px), payout = Math.floor(v.value);
+        await c.query("UPDATE positions SET status = 'closed', closed = now(), exit = $2, payout = $3 WHERE id = $1", [x.id, px, payout]);
+        if (payout > 0) await c.query('INSERT INTO balances (address, model, amount) VALUES ($1,$2,$3) ON CONFLICT (address, model) DO UPDATE SET amount = balances.amount + EXCLUDED.amount', [user, USDG, payout]);
+        await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'lev-close',$2,$3,$4)", [user, USDG, payout, JSON.stringify({ id: String(x.id), exit: px, gain: v.gain, fees: v.fees })]);
+        await c.query('COMMIT');
+        return send(res, 200, { position: posView({ ...x, status: 'closed', closed: new Date(), exit: px, payout }, null), balances: await balances(user) });
       } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
     }
 
@@ -781,8 +946,9 @@ server.listen(PORT, async () => {
   console.log('Halbrook on :' + PORT, TEST_MODE ? '(test mode)' : '', OR_KEY ? '(chat on)' : '(chat off)');
   try { await migrate(); } catch (e) { console.error('migrate', e.message); }
   await refreshPrices(); setInterval(refreshPrices, 60_000);
+  setInterval(sampleTicks, 60_000); sampleTicks();
   if (LIVE) { setInterval(scanDeposits, 15_000); setInterval(processWithdrawals, 20_000); scanDeposits(); }
-  console.log(LIVE ? `real money: deposits to ${TREASURY}, withdrawals ${WD_ON ? 'on' : 'off'}` : 'test money only');
+  console.log(LIVE ? `real money: deposits to ${TREASURY}, withdrawals ${WD_ON ? 'on' : 'off'}` : 'test money only', LEV_ON ? `· leverage on (x${LEV_MIN}-x${LEV_MAX})` : '· leverage off');
   if (WD_ON) {   // check the key matches the treasury; only the public address is ever logged
     try { const a = hot().wallet.account.address; console.log('hot wallet', a, a.toLowerCase() === TREASURY.toLowerCase() ? '(same as the treasury address)' : '(DIFFERENT from TREASURY_ADDRESS: deposits and withdrawals use two wallets)'); }
     catch (e) { console.error('TREASURY_PRIVATE_KEY is not a valid private key: withdrawals cannot be sent'); }

@@ -1000,6 +1000,40 @@ html[data-theme="light"] .acct-b.acct-ghost{background:transparent;color:#121115
 /* ==== end light theme ==== */
 .rh-f{display:inline-grid;place-items:center;width:40px;height:44px;color:#fff}.rh-f svg{width:18px;height:18px;fill:currentColor}
 html[data-theme="light"] .rh-f{color:#17161b}
+
+/* leverage tab (shown only when the server turns leverage on) */
+.tx-tabs[hidden],.tx-swap[hidden],.tx-lev[hidden]{display:none!important}
+.tx-tabs{display:flex;gap:4px;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.tx-tabs button{flex:1;padding:10px;border:0;border-radius:9px;background:none;color:var(--muted);font:600 13px/1 var(--b);cursor:pointer}
+.tx-tabs button.on{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.tx-tabs small{margin-left:6px;padding:2px 6px;border-radius:5px;background:rgba(255,226,92,.14);color:#ffe25c;font:600 10px/1 var(--b);letter-spacing:.06em}
+.tx-lev{display:flex;flex-direction:column;gap:10px;padding-top:18px;border-top:1px solid rgba(255,255,255,.07)}
+.lv-side{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lv-side button{padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:none;color:#d9d4cc;font:600 14px/1 var(--b);cursor:pointer}
+.lv-side button.on[data-s=long]{background:rgba(95,211,154,.14);border-color:rgba(95,211,154,.6);color:#5fd39a}
+.lv-side button.on[data-s=short]{background:rgba(255,90,108,.14);border-color:rgba(255,90,108,.6);color:#ff7a88}
+.lv-x{display:flex;gap:6px}
+.lv-x button{flex:1;padding:10px 0;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:none;color:#d9d4cc;font:600 13px/1 var(--m);cursor:pointer}
+.lv-x button.on{background:#fff;color:#000;border-color:#fff}
+.lv-sum{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font:400 13px/1.3 var(--b);color:var(--muted)}
+.lv-sum b{text-align:right;color:#fff;font:500 13px/1.3 var(--m)}
+.lv-go.long{background:linear-gradient(180deg,#5fd39a,#2a8a5c);box-shadow:0 10px 26px rgba(42,138,92,.35)}
+.lv-pos{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.lv-pos h4{margin:6px 0 0;font:500 11px/1 var(--b);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.lv-p{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);font:400 12.5px/1.35 var(--b);color:var(--muted)}
+.lv-p.done{grid-template-columns:1fr}.lv-p b{color:#fff;font-weight:600}.lv-p .up{color:#5fd39a}.lv-p .dn{color:#ff7a88}
+.lv-p button{grid-row:1/3;grid-column:2;align-self:center;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:none;color:#fff;font:600 12px/1 var(--b);cursor:pointer}
+html[data-theme="light"] .tx-tabs{background:rgba(22,20,26,.04);box-shadow:inset 0 0 0 1px rgba(22,20,26,.08)}
+html[data-theme="light"] .tx-tabs button.on{background:#fff;color:#121115;box-shadow:0 1px 3px rgba(60,45,30,.18)}
+html[data-theme="light"] .tx-tabs small{background:rgba(180,140,0,.12);color:#8a6a00}
+html[data-theme="light"] .tx-lev{border-top-color:rgba(22,20,26,.08)}
+html[data-theme="light"] .lv-side button,html[data-theme="light"] .lv-x button{border-color:rgba(22,20,26,.16);color:#37363a}
+html[data-theme="light"] .lv-side button.on[data-s=long]{color:#1d7a4c}html[data-theme="light"] .lv-side button.on[data-s=short]{color:#c21d31}
+html[data-theme="light"] .lv-x button.on{background:#121115;color:#fff;border-color:#121115}
+html[data-theme="light"] .lv-sum b,html[data-theme="light"] .lv-p b{color:#121115}
+html[data-theme="light"] .lv-p{background:rgba(22,20,26,.032);box-shadow:inset 0 0 0 1px rgba(22,20,26,.063)}
+html[data-theme="light"] .lv-p button{border-color:rgba(22,20,26,.2);color:#121115}
+html[data-theme="light"] .lv-p .up{color:#1d7a4c}html[data-theme="light"] .lv-p .dn{color:#c21d31}
 </style>
 </head>
 <body>
@@ -1053,6 +1087,7 @@ html[data-theme="light"] .rh-f{color:#17161b}
     </div>
     <aside class="tx-card" aria-label="Trade">
       <div id="mkSide" aria-live="polite"></div>
+      <div class="tx-tabs" id="txTabs" role="tablist" hidden><button type="button" role="tab" data-t="swap" class="on" aria-selected="true">Swap</button><button type="button" role="tab" data-t="lev" aria-selected="false">Leverage<small>NEW</small></button></div>
       <div class="tx-swap">
         <div class="tx-field"><div class="tx-lab"><label for="swAmt">You give</label><span class="tx-have" id="swHave"></span></div><div class="tx-row"><input id="swAmt" type="text" value="1M" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Amount, for example 1M, 500K or 10"><span class="tx-u">M</span><span class="tx-ico" id="swFromIco"></span><select id="swFrom" class="tp-src" aria-label="From model"></select><button type="button" class="tp-btn" id="swFromBtn" aria-haspopup="listbox"></button></div></div>
         <button class="sw-flip" id="swFlip" type="button" aria-label="Swap direction">⇅</button>
@@ -1060,6 +1095,15 @@ html[data-theme="light"] .rh-f{color:#17161b}
         <div class="sw-rate" id="swRate">—</div>
         <button class="sw-go" id="swGo" type="button">Swap</button>
         <p class="sw-note" id="swNote">Market price · 0.3% fee · your swap moves the premium</p>
+      </div>
+      <div class="tx-lev" id="txLev" hidden>
+        <div class="lv-side" role="group" aria-label="Direction"><button type="button" data-s="long" class="on">Long ↑</button><button type="button" data-s="short">Short ↓</button></div>
+        <div class="tx-field"><div class="tx-lab"><label for="lvAmt">Margin</label><span class="tx-have" id="lvHave"></span></div><div class="tx-row"><input id="lvAmt" type="text" value="10" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Margin in USDG"><span class="tx-ico"><span class="usd">$</span></span><span class="lv-u">USDG</span></div></div>
+        <div class="lv-x" id="lvX" role="group" aria-label="Leverage"></div>
+        <div class="lv-sum" id="lvSum"></div>
+        <button class="sw-go lv-go long" id="lvGo" type="button">Open long</button>
+        <p class="sw-note" id="lvNote"></p>
+        <div class="lv-pos" id="lvPos"></div>
       </div>
       <details class="tx-more"><summary>Hosts and details</summary><div id="mkMore"></div></details>
     </aside>
@@ -1225,7 +1269,7 @@ async function loadMe() {
     if (account && r.address && r.address.toLowerCase() !== account.toLowerCase()) { token = null; try { localStorage.removeItem('hb-token'); } catch (e) {} me = null; }
     else { me = r; loadWallet(); }
   }
-  renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi();
+  renderAcct(); renderChatTop(); if (!$('api').hidden) renderApi(); if (typeof loadLev === 'function' && lev && lev.enabled) loadLev();
 }
 let flashT = null;
 function flash(t) { const el = $('acctMsg'); if (!el) { if (t) { $('walMsg').textContent = t; $('walPop').hidden = false; } return; } el.textContent = t; clearTimeout(flashT); flashT = setTimeout(() => { el.textContent = ''; }, 5000); }
@@ -1418,7 +1462,7 @@ function render() {
       ${h.length ? h.slice(0, 5).map((x, i) => `<div class="ob-r ${i === 0 ? 'ob-b best' : 'ob-n'}" style="--w:${Math.max(8, x.p / maxP * 100)}%"><span>${x.name}${x.tier ? `<em class="t-${x.tier}">${{ flex: 'Flex · slower', fast: 'Fast', ultrafast: 'Ultra-fast', priority: 'Priority' }[x.tier]}</em>` : (x.q && x.q !== 'unknown' ? `<em>${x.q}</em>` : '')}</span><span>${usd(x.p)}</span><span>${((x.p - m.ref) / m.ref * 100).toFixed(0)}%</span></div>`).join('') : '<p class="sub">Loading hosts…</p>'}
     </div>
     <dl class="spec"><dt>Input</dt><dd>${usd(m.inP)} / M</dd><dt>Output</dt><dd>${usd(m.outP)} / M</dd><dt>Context</dt><dd>${fmtK(m.ctx)} tokens</dd>${m.maxOut ? `<dt>Max output</dt><dd>${fmtK(m.maxOut)} tokens</dd>` : ''}<dt>Reads</dt><dd>${m.mod || 'text'}</dd><dt>Reasoning</dt><dd>${m.reason ? 'yes' : 'no'}</dd></dl>`;
-  renderSwap();
+  renderSwap(); if (typeof renderLev === 'function') renderLev();
 }
 /* swap: live price ratio between two models (demo until balances are live) */
 function fillSelects() {
@@ -1534,6 +1578,59 @@ $('swGo').addEventListener('click', async () => {
   $('swNote').textContent = `Swapped ${fmtTok(r.gave)} ${nameOf($('swFrom').value)} → ${fmtTok(r.got)} ${nameOf($('swTo').value)}`;
   me.balances = r.balances; renderAcct(); renderChatTop(); loadMkt();
 });
+/* ---------- leverage: long / short a model with x2 to x5, margin in USDG (only when the server turns it on) ---------- */
+let lev = null, lvSide = 'long', lvX = 2, lvPositions = [];
+const usd2 = v => (v < 0 ? '−$' : '$') + Math.abs(v).toFixed(2);
+async function loadLev() {
+  try { const r = await fetch('/api/leverage'); if (!r.ok) return; lev = await r.json(); } catch (e) { return; }
+  $('txTabs').hidden = !lev.enabled; if (!lev.enabled) { lvTab('swap'); return; }
+  if (!$('lvX').children.length) { const xs = []; for (let x = lev.min; x <= lev.max; x++) xs.push(x);
+    $('lvX').innerHTML = xs.map(x => `<button type="button" data-x="${x}"${x === lvX ? ' class="on"' : ''}>x${x}</button>`).join(''); }
+  if (me) { const r = await api('/api/positions'); if (r.ok) lvPositions = r.positions || []; } else lvPositions = [];
+  renderLev();
+}
+function lvTab(t) { $('txTabs').querySelectorAll('button').forEach(b => { const on = b.dataset.t === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.querySelector('.tx-swap').hidden = t !== 'swap'; $('txLev').hidden = t !== 'lev'; if (t === 'lev') renderLev(); }
+$('txTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) lvTab(b.dataset.t); });
+$('txLev').querySelector('.lv-side').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; lvSide = b.dataset.s; renderLev(); });
+$('lvX').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; lvX = +b.dataset.x; renderLev(); });
+$('lvAmt').addEventListener('input', () => renderLev());
+function renderLev() {
+  if (!lev || !lev.enabled) return;
+  const m = (lev.markets || []).find(x => x.id === sel), name = nameOf(sel), margin = Math.max(0, parseFloat(String($('lvAmt').value).replace(',', '.')) || 0);
+  $('txLev').querySelectorAll('.lv-side button').forEach(b => b.classList.toggle('on', b.dataset.s === lvSide));
+  $('lvX').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.x === lvX));
+  const u = me && me.balances.find(x => x.model === 'usdg'), have = u ? u.tokens / 1e6 : 0;
+  $('lvHave').innerHTML = me ? `Balance: <b>$${have.toFixed(2)}</b>` + (have >= 1 ? ' <button type="button" class="tx-max">Max</button>' : '') : '';
+  const mx = $('lvHave').querySelector('.tx-max'); if (mx) mx.onclick = () => { $('lvAmt').value = String(Math.floor(Math.min(have / (1 + lvX * lev.openFee), lev.marginMax) * 100) / 100); renderLev(); };
+  const size = margin * lvX, fee = size * lev.openFee;
+  let entry = null, liq = null;
+  if (m && m.ready) { entry = lvSide === 'long' ? Math.max(m.spot, m.mark) : Math.min(m.spot, m.mark);
+    const room = (margin * (1 - lev.maintenance) - size * lev.closeFee) / (size || 1); liq = lvSide === 'long' ? entry * (1 - room) : entry * (1 + room); }
+  const per = v => v == null ? '—' : '$' + v.toFixed(v >= 10 ? 2 : 3) + ' / M';
+  $('lvSum').innerHTML = `<span>Position size</span><b>${usd2(size)}</b><span>Entry price</span><b>${per(entry)}</b><span>Liquidated at</span><b>${liq == null ? '—' : liq <= 0 || (m && (liq < m.floor || liq > m.cap)) ? 'out of reach' : per(liq)}</b><span>Fee to open</span><b>${usd2(fee)}</b>`;
+  $('lvGo').textContent = `${lvSide === 'long' ? 'Long' : 'Short'} ${name} x${lvX}`; $('lvGo').classList.toggle('long', lvSide === 'long');
+  if (!$('lvNote').dataset.msg) $('lvNote').textContent = m && !m.ready ? 'The mark price for this model is warming up. Back in a few minutes.' : `Mark price = average of the last ${lev.twapMin} min · ${(lev.openFee * 100).toFixed(1)}% to open and to close · ${(lev.feeHourly * 100).toFixed(2)}% per hour held · up to $${lev.marginMax} of margin`;
+  const open = lvPositions.filter(x => x.status === 'open'), done = lvPositions.filter(x => x.status !== 'open').slice(0, 5);
+  $('lvPos').innerHTML = (open.length ? '<h4>Open positions</h4>' + open.map(x => `<div class="lv-p"><span><b>${x.side === 'long' ? 'Long' : 'Short'} ${esc(x.name)} x${x.leverage}</b> · ${usd2(x.margin)} margin</span><button type="button" data-close="${esc(x.id)}">Close</button><span>${x.value == null ? 'Value pending' : `Worth <b>${usd2(x.value)}</b> <span class="${x.pnl >= 0 ? 'up' : 'dn'}">${x.pnl >= 0 ? '+' : ''}${usd2(x.pnl)}</span>`} · liq. ${per(x.liq)}</span></div>`).join('') : '')
+    + (done.length ? '<h4>Recently closed</h4>' + done.map(x => `<div class="lv-p done"><span><b>${x.side === 'long' ? 'Long' : 'Short'} ${esc(x.name)} x${x.leverage}</b> · ${x.status === 'liquidated' ? 'liquidated' : 'closed'}</span><span>${usd2(x.margin)} in · ${usd2(x.payout || 0)} back</span></div>`).join('') : '');
+}
+function lvMsg(t, keep) { $('lvNote').dataset.msg = '1'; $('lvNote').innerHTML = t; clearTimeout(lvMsg.t); lvMsg.t = setTimeout(() => { delete $('lvNote').dataset.msg; renderLev(); }, keep || 6000); }
+$('lvPos').addEventListener('click', async e => { const b = e.target.closest('[data-close]'); if (!b) return; b.disabled = true;
+  const r = await api(`/api/positions/${b.dataset.close}/close`, { method: 'POST' });
+  if (!r.ok) { b.disabled = false; lvMsg(`<span class="sw-warn">${esc(r.error || 'Could not close. Try again.')}</span>`); return; }
+  lvMsg(`Closed: <b>${usd2(r.position.payout)}</b> back in your balance.`); me.balances = r.balances; renderAcct(); loadLev(); });
+$('lvGo').addEventListener('click', async () => {
+  if (!cfg) return; if (!me) { await signIn(); if (!me) return; }
+  const margin = parseFloat(String($('lvAmt').value).replace(',', '.'));
+  if (!(margin >= 1)) return lvMsg('<span class="sw-warn">Put at least 1 USDG of margin.</span>');
+  $('lvGo').disabled = true;
+  const r = await api('/api/positions', { method: 'POST', body: JSON.stringify({ model: sel, side: lvSide, margin, leverage: lvX }) });
+  $('lvGo').disabled = false;
+  if (!r.ok) return lvMsg(`<span class="sw-warn">${esc(r.error || 'Could not open the position. Try again.')}</span>`);
+  lvMsg(`Opened: ${lvSide} ${esc(nameOf(sel))} x${lvX} with ${usd2(margin)} of margin.`); me.balances = r.balances; renderAcct(); loadLev();
+});
+loadLev(); setInterval(() => { if (lev && lev.enabled) loadLev(); }, 30_000);
 /* ---------- chat ---------- */
 const thread = [];   // one conversation for every model: switch models and it follows
 let memNotes = null;
