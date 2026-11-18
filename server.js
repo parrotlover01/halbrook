@@ -849,6 +849,22 @@ async function api(req, res, p) {
     }
 
     /* API keys: shown once at creation, stored only as a SHA-256 hash, revocable */
+    // usage: every chat and API request of this account, with what it cost, plus daily totals (30 days)
+    if (p === '/api/usage' && req.method === 'GET') {
+      if (overLimit('usage:' + user, 30, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      const [rows, days] = await Promise.all([
+        db.query(`SELECT l.ts, l.meta, k.prefix FROM ledger l LEFT JOIN api_keys k ON k.id::text = l.meta->>'key' AND k.address = l.address
+                  WHERE l.address = $1 AND l.kind = 'chat' ORDER BY l.ts DESC, l.id DESC LIMIT 50`, [user]),
+        db.query(`SELECT date_trunc('day', ts) AS d, COUNT(*)::int AS n, COALESCE(SUM((meta->>'paid')::numeric), 0) AS paid, COALESCE(SUM((meta->>'refCost')::numeric), 0) AS ref
+                  FROM ledger WHERE address = $1 AND kind = 'chat' AND ts > now() - interval '30 days' GROUP BY 1 ORDER BY 1`, [user])]);
+      const k = 1 + MARGIN;
+      return send(res, 200, {
+        requests: rows.rows.map(r => { const m = r.meta || {}, P = priceOf(m.model);
+          return { ts: r.ts, model: m.model, name: P ? P.name : m.model, via: m.via === 'api' ? 'api' : 'chat', key: r.prefix || null, tokensIn: Number(m.pin) || 0, tokensOut: Number(m.pout) || 0,
+            charged: (Number(m.paid) || 0) * k, official: (Number(m.refCost) || 0) * k, host: m.provider || null, stream: !!m.stream }; }),
+        days: days.rows.map(r => ({ day: r.d, requests: r.n, charged: Number(r.paid) * k, official: Number(r.ref) * k })) });
+    }
+
     if (p === '/api/keys' && req.method === 'GET') {
       const { rows } = await db.query('SELECT id, prefix, label, created, last_used, spent FROM api_keys WHERE address = $1 AND NOT revoked ORDER BY created DESC', [user]);
       return send(res, 200, { keys: rows.map(k => ({ id: String(k.id), prefix: k.prefix, label: k.label, created: k.created, lastUsed: k.last_used, spent: Number(k.spent) })) });
