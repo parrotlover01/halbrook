@@ -42,6 +42,9 @@ const API_ON = process.env.API_ENABLED === '1';
 // leverage: off unless LEVERAGE_ENABLED=1 (see the leverage block below)
 const LEV_ON = process.env.LEVERAGE_ENABLED === '1';
 const LEV_MIN = 2, LEV_MAX = Math.min(5, Math.max(LEV_MIN, Number(process.env.LEVERAGE_MAX || 5)));
+// flagship models go up to LEV_MAX, every other model (and every model added later) up to x2
+const LEV_FLAGSHIP = (process.env.LEVERAGE_FLAGSHIP || 'anthropic/claude-opus-5.5,openai/gpt-6-astra').split(',').map(x => x.trim()).filter(Boolean);
+const levMaxOf = m => LEV_FLAGSHIP.includes(m) ? LEV_MAX : LEV_MIN;
 const LEV_MARGIN_MAX = Number(process.env.LEVERAGE_MARGIN_MAX_USD || 20);   // USDG of margin per position, at most
 const LEV_OI_MAX = Number(process.env.LEVERAGE_OI_MAX_USD || 100);          // open size per model and side, USD
 const LEV_TWAP_MIN = Number(process.env.LEVERAGE_TWAP_MIN || 15);           // mark price: average market price over this many minutes
@@ -531,7 +534,7 @@ async function api(req, res, p) {
       if (!LEV_ON) return send(res, 200, base);
       const prem = await premiums(), [k, oi] = await Promise.all([marks(prem), db.query("SELECT model, side, SUM(size) AS s FROM positions WHERE status = 'open' GROUP BY model, side")]);
       const oiOf = (m, side) => Number((oi.rows.find(r => r.model === m && r.side === side) || {}).s || 0) / 1e6;
-      return send(res, 200, { ...base, markets: Object.entries(k).map(([id, x]) => ({ id, name: PRICES[id].name, spot: x.spot * 1e6, mark: x.mark == null ? null : x.mark * 1e6, ready: x.ready,
+      return send(res, 200, { ...base, markets: Object.entries(k).map(([id, x]) => ({ id, name: PRICES[id].name, spot: x.spot * 1e6, mark: x.mark == null ? null : x.mark * 1e6, ready: x.ready, max: levMaxOf(id),
         floor: PRICES[id].blend * (1 - BAND) * 1e6, cap: PRICES[id].blend * (1 + BAND) * 1e6, oiLong: oiOf(id, 'long'), oiShort: oiOf(id, 'short') })) });
     }
 
@@ -688,7 +691,7 @@ async function api(req, res, p) {
       const lev = Number(leverage), m = Math.round(Number(margin) * 1e6);
       if (!priceOf(model)) return send(res, 400, { error: 'Pick a model' });
       if (side !== 'long' && side !== 'short') return send(res, 400, { error: 'Pick long or short' });
-      if (!Number.isInteger(lev) || lev < LEV_MIN || lev > LEV_MAX) return send(res, 400, { error: `Leverage is x${LEV_MIN} to x${LEV_MAX}` });
+      if (!Number.isInteger(lev) || lev < LEV_MIN || lev > levMaxOf(model)) return send(res, 400, { error: levMaxOf(model) === LEV_MIN ? `Leverage on this model is x${LEV_MIN}` : `Leverage is x${LEV_MIN} to x${levMaxOf(model)}` });
       if (!Number.isSafeInteger(m) || m < 1e6) return send(res, 400, { error: 'Put at least 1 USDG of margin' });
       if (m > LEV_MARGIN_MAX * 1e6) return send(res, 400, { error: `${LEV_MARGIN_MAX} USDG of margin at most per position` });
       const size = m * lev, feeOpen = Math.ceil(size * SWAP_FEE);
