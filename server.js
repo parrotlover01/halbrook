@@ -28,6 +28,10 @@ const CHAIN = { id: 4663, name: 'Robinhood Chain', rpc: process.env.RH_RPC || 'h
 const USDG_CONTRACT = process.env.USDG_CONTRACT || '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168';   // checked on-chain: "Global Dollar", USDG, 6 decimals
 const TREASURY = (() => { try { return process.env.TREASURY_ADDRESS ? getAddress(process.env.TREASURY_ADDRESS.trim()) : null; } catch { return null; } })();
 const LIVE = !TEST_MODE && !!TREASURY;
+// earlier treasury addresses, kept during a move to a new one (e.g. a Safe): deposits sent there are still credited,
+// their USDG still counts in the reserves, and what they send to the new treasury is never mistaken for a deposit
+const LEGACY = (process.env.LEGACY_TREASURY_ADDRESSES || '').split(',').map(x => { try { return getAddress(x.trim()); } catch { return null; } })
+  .filter(a => a && (!TREASURY || a.toLowerCase() !== TREASURY.toLowerCase()));
 const WD_ON = LIVE && process.env.WITHDRAWALS_ENABLED === '1' && !!process.env.TREASURY_PRIVATE_KEY;
 const WD_MAX = Number.isFinite(Number(process.env.WITHDRAW_MAX_USD)) && Number(process.env.WITHDRAW_MAX_USD) > 0 ? Number(process.env.WITHDRAW_MAX_USD) : 100;              // per withdrawal
 const WD_DAILY = Number.isFinite(Number(process.env.WITHDRAW_DAILY_USD)) && Number(process.env.WITHDRAW_DAILY_USD) > 0 ? Number(process.env.WITHDRAW_DAILY_USD) : 200;          // per account, 24 h
@@ -92,7 +96,7 @@ async function migrate() {
   if (LIVE) { await goLive(); await voidSelfDeposits(); }
 }
 async function voidSelfDeposits() {
-  OWN.add(TREASURY.toLowerCase());
+  OWN.add(TREASURY.toLowerCase()); for (const a of LEGACY) OWN.add(a.toLowerCase());
   if (WD_ON) { try { OWN.add(hot().wallet.account.address.toLowerCase()); } catch {} }
   const { rows } = await db.query("SELECT tx_hash, log_index, address, amount FROM deposits d WHERE NOT EXISTS (SELECT 1 FROM ledger WHERE kind = 'deposit-void' AND meta->>'tx' = d.tx_hash AND meta->>'log' = d.log_index::text)");
   for (const d of rows) {
@@ -292,7 +296,7 @@ async function scanDeposits() {
     let from = Number((await db.query("SELECT value FROM settings WHERE key = 'deposit_block'")).rows[0].value) + 1;
     while (from <= head) {
       const to = Math.min(head, from + 1999);
-      const logs = await rpc('eth_getLogs', [{ address: USDG_CONTRACT, topics: [TRANSFER, null, topicOf(TREASURY)], fromBlock: '0x' + from.toString(16), toBlock: '0x' + to.toString(16) }]);
+      const logs = await rpc('eth_getLogs', [{ address: USDG_CONTRACT, topics: [TRANSFER, null, [TREASURY, ...LEGACY].map(topicOf)], fromBlock: '0x' + from.toString(16), toBlock: '0x' + to.toString(16) }]);
       const c = await db.connect();
       try {
         await c.query('BEGIN');
@@ -378,16 +382,18 @@ async function solvency(force = false) {
   if (pos.length) { const k = await marks(prem);
     for (const x of pos) { const mk = k[x.model]; levOwed += (mk && mk.ready ? posValue(x, exitPx(x.side, mk)).value : Number(x.margin)) / 1e6; levWorst += posWorst(x) / 1e6; }
     owed += levOwed; atMarket += levOwed; atRef += levOwed; byAsset.push({ asset: 'leverage', name: 'Leveraged positions', units: pos.length, usd: levOwed }); }
-  let held = null, hotAddr = null, hotUsdg = null, treasuryUsdg = null, hotEth = null, treasuryEth = null;
+  let held = null, hotAddr = null, hotUsdg = null, treasuryUsdg = null, hotEth = null, treasuryEth = null; const legacyUsdg = [];
   if (LIVE) {
     const read = async a => Number(BigInt(await rpc('eth_call', [{ to: USDG_CONTRACT, data: '0x70a08231' + a.slice(2).toLowerCase().padStart(64, '0') }, 'latest']))) / 1e6;
     treasuryUsdg = await read(TREASURY); held = treasuryUsdg;
     treasuryEth = Number(BigInt(await rpc('eth_getBalance', [TREASURY, 'latest']))) / 1e18;
+    const counted = new Set([TREASURY.toLowerCase()]);
+    for (const a of LEGACY) { const u = await read(a); legacyUsdg.push({ address: a, usdg: u }); held += u; counted.add(a.toLowerCase()); }
     if (WD_ON) { hotAddr = hot().wallet.account.address;
-      if (hotAddr.toLowerCase() !== TREASURY.toLowerCase()) { hotUsdg = await read(hotAddr); held += hotUsdg; } else hotUsdg = treasuryUsdg;
+      if (!counted.has(hotAddr.toLowerCase())) { hotUsdg = await read(hotAddr); held += hotUsdg; } else hotUsdg = hotAddr.toLowerCase() === TREASURY.toLowerCase() ? treasuryUsdg : (legacyUsdg.find(x => x.address.toLowerCase() === hotAddr.toLowerCase()) || {}).usdg;
       hotEth = Number(BigInt(await rpc('eth_getBalance', [hotAddr, 'latest']))) / 1e18; }
   }
-  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, treasuryEth, hotWallet: hotAddr, hotUsdg, hotEth, owed, levOwed, levWorst, levHeadroom: held == null ? null : held - (owed - levOwed) - levWorst, margin: held == null ? null : held - owed, ok: held == null || held >= owed - 1e-6, checked: new Date().toISOString() };
+  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, treasuryEth, legacyUsdg, hotWallet: hotAddr, hotUsdg, hotEth, owed, levOwed, levWorst, levHeadroom: held == null ? null : held - (owed - levOwed) - levWorst, margin: held == null ? null : held - owed, ok: held == null || held >= owed - 1e-6, checked: new Date().toISOString() };
   if (!data.ok) console.error(`RESERVE ALERT: holds ${held.toFixed(2)} USDG, owes ${owed.toFixed(2)}. Withdrawals paused.`);
   solv = { at: Date.now(), data }; return data;
 }
@@ -555,7 +561,7 @@ async function api(req, res, p) {
       if (overLimit('reserves:' + ipOf(req), 60, 60_000)) return send(res, 429, { error: 'Slow down a little' });
       if (!LIVE) return send(res, 200, { live: false });
       const d = await solvency();
-      return send(res, 200, { live: true, chain: CHAIN.name, explorer: CHAIN.explorer, usdgContract: USDG_CONTRACT, treasury: TREASURY,
+      return send(res, 200, { live: true, chain: CHAIN.name, explorer: CHAIN.explorer, usdgContract: USDG_CONTRACT, treasury: TREASURY, wallets: [{ role: 'treasury', address: TREASURY, usdg: d.treasuryUsdg }, ...(d.legacyUsdg || []).map(x => ({ role: 'previous treasury', address: x.address, usdg: x.usdg })), ...(d.hotWallet && ![TREASURY, ...LEGACY].some(a => a.toLowerCase() === d.hotWallet.toLowerCase()) ? [{ role: 'withdrawal wallet', address: d.hotWallet, usdg: d.hotUsdg }] : [])],
         held: d.held, owed: d.owed, owedAtMarket: d.owedAtMarket, owedAtReference: d.owedAtReference, pendingWithdrawals: d.pendingWithdrawals,
         margin: d.margin, ratio: d.owed > 0 ? d.held / d.owed : null, ok: d.ok,
         otherAssets: d.treasuryEth > 0 ? [{ asset: 'ETH', amount: d.treasuryEth, usd: (await ethUsd()) ? d.treasuryEth * ethPx.usd : null, counted: false }] : [], byAsset: d.byAsset.map(({ asset, name, usd }) => ({ asset, name, usd })), checked: d.checked });
@@ -996,8 +1002,8 @@ const SEC = { 'Content-Security-Policy': CSP, 'X-Content-Type-Options': 'nosniff
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()', 'Cross-Origin-Opener-Policy': 'same-origin-allow-popups' };
 const GZIP = /^(text\/|image\/svg)/;
 const ROOT_DIR = ROOT + path.sep;
-const CLEAN_URLS = { '/app': '/bureau.html', '/docs': '/docs.html', '/reserves': '/reserves.html', '/admin': '/admin.html' };
-const OLD_URLS = { '/bureau.html': '/app', '/docs.html': '/docs', '/reserves.html': '/reserves', '/admin.html': '/admin', '/index.html': '/' };
+const CLEAN_URLS = { '/app': '/bureau.html', '/docs': '/docs.html', '/reserves': '/reserves.html', '/admin': '/admin.html', '/vault': '/vault.html' };
+const OLD_URLS = { '/bureau.html': '/app', '/docs.html': '/docs', '/reserves.html': '/reserves', '/admin.html': '/admin', '/vault.html': '/vault', '/index.html': '/' };
 function serve(req, res, p) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
   // clean addresses: /app, /docs, /reserves, /admin. The old .html ones redirect for good, so shared links keep working.
@@ -1052,7 +1058,7 @@ server.listen(PORT, async () => {
   await refreshPrices(); setInterval(refreshPrices, 60_000);
   setInterval(sampleTicks, 60_000); sampleTicks();
   if (LIVE) { setInterval(scanDeposits, 15_000); setInterval(processWithdrawals, 20_000); scanDeposits(); }
-  console.log(LIVE ? `real money: deposits to ${TREASURY}, withdrawals ${WD_ON ? 'on' : 'off'}` : 'test money only', LEV_ON ? `· leverage on (x${LEV_MIN}-x${LEV_MAX})` : '· leverage off');
+  console.log(LIVE ? `real money: deposits to ${TREASURY}${LEGACY.length ? ' (also still watching ' + LEGACY.join(', ') + ')' : ''}, withdrawals ${WD_ON ? 'on' : 'off'}` : 'test money only', LEV_ON ? `· leverage on (x${LEV_MIN}-x${LEV_MAX})` : '· leverage off');
   if (WD_ON) {   // check the key matches the treasury; only the public address is ever logged
     try { const a = hot().wallet.account.address; console.log('hot wallet', a, a.toLowerCase() === TREASURY.toLowerCase() ? '(same as the treasury address)' : '(DIFFERENT from TREASURY_ADDRESS: deposits and withdrawals use two wallets)'); }
     catch (e) { console.error('TREASURY_PRIVATE_KEY is not a valid private key: withdrawals cannot be sent'); }

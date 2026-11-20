@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Halbrook · Vault</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{--bg:#050506;--ink:#ece6d8;--muted:#8f8b98;--line:rgba(236,230,216,.12);--red:#ef5a6f;--green:#5fd39a;--b:"Instrument Sans",system-ui,sans-serif;--m:"JetBrains Mono",ui-monospace,Menlo,monospace;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.6 var(--b)}
+main{max-width:760px;margin:0 auto;padding:48px 16px 96px}
+h1{margin:0 0 6px;font:500 30px/1.15 var(--b);color:#fff}
+.lead{margin:0 0 28px;color:var(--muted)}
+section{margin:0 0 22px;padding:22px;border-radius:16px;background:#0d0d11;box-shadow:inset 0 0 0 1px var(--line)}
+h2{margin:0 0 4px;font:600 17px/1.3 var(--b);color:#fff}
+h2 span{color:var(--red);margin-right:8px;font-family:var(--m)}
+p{margin:6px 0 12px}.muted{color:var(--muted);font-size:13.5px}
+label{display:block;margin:12px 0 6px;font:500 12px/1 var(--b);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+input,textarea,select{width:100%;padding:11px 12px;border-radius:10px;border:0;background:#15151b;box-shadow:inset 0 0 0 1px var(--line);color:#fff;font:500 13.5px var(--m)}
+textarea{min-height:84px;resize:vertical}
+button{margin-top:14px;padding:11px 18px;border:0;border-radius:10px;background:#fff;color:#000;font:600 14px/1 var(--b);cursor:pointer}
+button.alt{background:none;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+button:disabled{opacity:.5;cursor:default}
+.out{margin-top:12px;padding:12px;border-radius:10px;background:#09090c;box-shadow:inset 0 0 0 1px var(--line);font:500 12.5px/1.55 var(--m);white-space:pre-wrap;word-break:break-all;color:#d9d4cc}
+.out:empty{display:none}
+.ok{color:var(--green)}.err{color:var(--red)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 22px;padding:12px 16px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line)}
+.bar code{font:500 13px var(--m);color:#fff}
+@media (max-width:560px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Treasury vault</h1>
+  <p class="lead">Create the Halbrook treasury Safe on Robinhood Chain and move USDG out of it with your owners' signatures. Everything here is signed in your own wallet; nothing is sent to the Halbrook server.</p>
+  <div class="bar"><span id="who">No wallet connected</span><button type="button" id="connect" style="margin:0">Connect wallet</button></div>
+
+  <section>
+    <h2><span>1</span>Create the Safe</h2>
+    <p class="muted">One owner address per line (three is a good start: phone, computer, a backup kept offline). Two signatures will be needed for every move.</p>
+    <label for="owners">Owners</label><textarea id="owners" placeholder="0x…&#10;0x…&#10;0x…"></textarea>
+    <label for="thr">Signatures needed</label><select id="thr"><option>1</option><option selected>2</option><option>3</option></select>
+    <button type="button" id="create">Create Safe</button>
+    <div class="out" id="createOut"></div>
+  </section>
+
+  <section>
+    <h2><span>2</span>Open a Safe</h2>
+    <label for="safe">Safe address</label><input id="safe" placeholder="0x…" autocomplete="off" spellcheck="false">
+    <button type="button" class="alt" id="load">Load</button>
+    <div class="out" id="loadOut"></div>
+  </section>
+
+  <section>
+    <h2><span>3</span>Send USDG from the Safe</h2>
+    <p class="muted">Each owner opens this page, connects, fills the same transfer and clicks Sign. Paste every signature below (one per line), then anyone can execute.</p>
+    <div class="row"><div><label for="to">To</label><input id="to" placeholder="0x… (e.g. the withdrawal wallet)" autocomplete="off" spellcheck="false"></div><div><label for="amt">Amount (USDG)</label><input id="amt" placeholder="250" inputmode="decimal"></div></div>
+    <label for="nonce">Safe nonce</label><input id="nonce" placeholder="filled when you load the Safe">
+    <button type="button" id="sign">Sign this transfer</button>
+    <label for="sigs">Signatures (owner:signature, one per line)</label><textarea id="sigs" placeholder="0xOwner…:0xSignature…"></textarea>
+    <button type="button" id="exec">Execute</button>
+    <div class="out" id="sendOut"></div>
+  </section>
+</main>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+// Robinhood Chain and the official Safe 1.4.1 deployments (checked on chain)
+const CHAIN = 4663, HEXCHAIN = '0x1237';
+const USDG = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168';
+const FACTORY = '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67', SINGLETON_L2 = '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762', FALLBACK = '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99';
+const ZERO = '0x0000000000000000000000000000000000000000';
+const SEL = { setup: 'b63e800d', create: '1688f0b9', getNonce: 'd087d288', getThreshold: 'e75235b8', getOwners: 'a0e67e2b', exec: '6a761202', transfer: 'a9059cbb', balanceOf: '70a08231' };
+const PROXY_CREATION = '0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235';
+
+/* ---- minimal ABI encoding: address, uint, bytes, address[] ---- */
+const isAddr = a => /^0x[0-9a-fA-F]{40}$/.test(a);
+const word = v => BigInt(v).toString(16).padStart(64, '0');
+const addrWord = a => a.toLowerCase().slice(2).padStart(64, '0');
+const bytesTail = hex => { const h = hex.replace(/^0x/, ''); return word(h.length / 2) + h.padEnd(Math.ceil(h.length / 64) * 64, '0'); };
+function encode(types, values) {
+  let head = '', tail = ''; const headLen = types.length * 32;
+  types.forEach((t, i) => { const v = values[i];
+    if (t === 'address') head += addrWord(v);
+    else if (t === 'uint') head += word(v);
+    else if (t === 'bytes') { head += word(headLen + tail.length / 2); tail += bytesTail(v); }
+    else if (t === 'address[]') { head += word(headLen + tail.length / 2); tail += word(v.length) + v.map(addrWord).join(''); } });
+  return head + tail;
+}
+window.__vaultEncode = encode;   // used by the self-test
+
+const eth = (method, params = []) => window.ethereum.request({ method, params });
+let me = null;
+const say = (el, html) => { $(el).innerHTML = html; };
+async function ensureChain() {
+  const c = await eth('eth_chainId');
+  if (parseInt(c, 16) === CHAIN) return;
+  try { await eth('wallet_switchEthereumChain', [{ chainId: HEXCHAIN }]); }
+  catch (e) { if (e.code !== 4902) throw e; await eth('wallet_addEthereumChain', [{ chainId: HEXCHAIN, chainName: 'Robinhood Chain', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'], blockExplorerUrls: ['https://robinhoodchain.blockscout.com'] }]); }
+  if (parseInt(await eth('eth_chainId'), 16) !== CHAIN) throw new Error('Switch your wallet to Robinhood Chain');
+}
+$('connect').onclick = async () => {
+  if (!window.ethereum) return say('who', '<span class="err">No wallet found in this browser</span>');
+  try { [me] = await eth('eth_requestAccounts'); await ensureChain(); say('who', `Connected <code>${me}</code>`); } catch (e) { say('who', `<span class="err">${e.message}</span>`); }
+};
+const call = async (to, data) => eth('eth_call', [{ to, data: '0x' + data }, 'latest']);
+async function waitReceipt(hash) { for (let i = 0; i < 90; i++) { const r = await eth('eth_getTransactionReceipt', [hash]); if (r) return r; await new Promise(r => setTimeout(r, 2000)); } throw new Error('No receipt yet: check the explorer'); }
+const explorer = h => `https://robinhoodchain.blockscout.com/tx/${h}`;
+
+/* ---- 1. create ---- */
+$('create').onclick = async () => {
+  try {
+    if (!me) throw new Error('Connect your wallet first'); await ensureChain();
+    const owners = $('owners').value.split(/[\s,]+/).filter(Boolean); const thr = +$('thr').value;
+    if (!owners.length || !owners.every(isAddr)) throw new Error('Each owner must be a 0x address');
+    if (new Set(owners.map(o => o.toLowerCase())).size !== owners.length) throw new Error('Each owner only once');
+    if (thr > owners.length) throw new Error('More signatures needed than owners');
+    if (!confirm(`Create a Safe on Robinhood Chain with ${owners.length} owners, ${thr} signature(s) needed?`)) return;
+    const init = SEL.setup + encode(['address[]', 'uint', 'address', 'bytes', 'address', 'address', 'uint', 'address'], [owners, thr, ZERO, '0x', FALLBACK, ZERO, 0, ZERO]);
+    const data = '0x' + SEL.create + encode(['address', 'bytes', 'uint'], [SINGLETON_L2, '0x' + init, Date.now()]);
+    say('createOut', 'Confirm in your wallet…');
+    const hash = await eth('eth_sendTransaction', [{ from: me, to: FACTORY, data }]);
+    say('createOut', `Sent: <a href="${explorer(hash)}" target="_blank" rel="noopener">${hash}</a>\nWaiting for it to land…`);
+    const rc = await waitReceipt(hash);
+    const lg = (rc.logs || []).find(l => l.topics && l.topics[0] === PROXY_CREATION);
+    if (rc.status !== '0x1' || !lg) throw new Error('The transaction failed: ' + hash);
+    const safe = '0x' + lg.topics[1].slice(26);
+    $('safe').value = safe;
+    say('createOut', `<span class="ok">Safe created:</span> ${safe}\nNext: send it a tiny amount first, then set it as TREASURY_ADDRESS on Railway (see the guide).`);
+    loadSafe();
+  } catch (e) { say('createOut', `<span class="err">${e.message || e}</span>`); }
+};
+
+/* ---- 2. load ---- */
+async function loadSafe() {
+  const safe = $('safe').value.trim(); if (!isAddr(safe)) return say('loadOut', '<span class="err">Not an address</span>');
+  try {
+    const [n, t, o, b] = await Promise.all([call(safe, SEL.getNonce), call(safe, SEL.getThreshold), call(safe, SEL.getOwners), call(USDG, SEL.balanceOf + addrWord(safe))]);
+    const h = o.slice(2), len = parseInt(h.slice(64, 128), 16), owners = Array.from({ length: len }, (_, i) => '0x' + h.slice(128 + i * 64 + 24, 128 + (i + 1) * 64));
+    $('nonce').value = String(parseInt(n, 16));
+    say('loadOut', `USDG: ${(Number(BigInt(b)) / 1e6).toFixed(2)}\nSignatures needed: ${parseInt(t, 16)} of ${len}\nNonce: ${parseInt(n, 16)}\nOwners:\n${owners.join('\n')}`);
+  } catch (e) { say('loadOut', `<span class="err">Could not read this Safe: ${e.message || e}</span>`); }
+}
+$('load').onclick = () => { if (!window.ethereum) return say('loadOut', '<span class="err">Connect a wallet first</span>'); loadSafe(); };
+
+/* ---- 3. send ---- */
+function transfer() {
+  const safe = $('safe').value.trim(), to = $('to').value.trim(), units = Math.round(parseFloat(String($('amt').value).replace(',', '.')) * 1e6), nonce = $('nonce').value.trim();
+  if (!isAddr(safe)) throw new Error('Load the Safe first');
+  if (!isAddr(to)) throw new Error('"To" must be a 0x address');
+  if (!(units > 0)) throw new Error('Enter an amount');
+  if (!/^\d+$/.test(nonce)) throw new Error('Nonce missing: load the Safe');
+  return { safe, to, units, nonce: +nonce, data: '0x' + SEL.transfer + encode(['address', 'uint'], [to, units]) };
+}
+function typed(t) {
+  return { types: { EIP712Domain: [{ name: 'chainId', type: 'uint256' }, { name: 'verifyingContract', type: 'address' }],
+      SafeTx: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }, { name: 'operation', type: 'uint8' }, { name: 'safeTxGas', type: 'uint256' }, { name: 'baseGas', type: 'uint256' }, { name: 'gasPrice', type: 'uint256' }, { name: 'gasToken', type: 'address' }, { name: 'refundReceiver', type: 'address' }, { name: 'nonce', type: 'uint256' }] },
+    primaryType: 'SafeTx', domain: { chainId: CHAIN, verifyingContract: t.safe },
+    message: { to: USDG, value: '0', data: t.data, operation: 0, safeTxGas: '0', baseGas: '0', gasPrice: '0', gasToken: ZERO, refundReceiver: ZERO, nonce: String(t.nonce) } };
+}
+window.__vaultTyped = typed;
+$('sign').onclick = async () => {
+  try {
+    if (!me) throw new Error('Connect your wallet first'); await ensureChain();
+    const t = transfer();
+    if (!confirm(`Sign: send ${(t.units / 1e6).toFixed(2)} USDG from the Safe to ${t.to}?`)) return;
+    const sig = await eth('eth_signTypedData_v4', [me, JSON.stringify(typed(t))]);
+    const line = `${me}:${sig}`;
+    $('sigs').value = ($('sigs').value.trim() ? $('sigs').value.trim() + '\n' : '') + line;
+    say('sendOut', `<span class="ok">Signed.</span> Send this line to the other owners:\n${line}`);
+  } catch (e) { say('sendOut', `<span class="err">${e.message || e}</span>`); }
+};
+$('exec').onclick = async () => {
+  try {
+    if (!me) throw new Error('Connect your wallet first'); await ensureChain();
+    const t = transfer();
+    const sigs = $('sigs').value.split(/\n+/).map(x => x.trim()).filter(Boolean).map(x => { const [o, s] = x.split(':'); if (!isAddr(o) || !/^0x[0-9a-fA-F]{130}$/.test(s || '')) throw new Error('Bad signature line: ' + x.slice(0, 20) + '…'); return { o: o.toLowerCase(), s: s.slice(2) }; });
+    const seen = new Set(); for (const x of sigs) { if (seen.has(x.o)) throw new Error('Two signatures from the same owner'); seen.add(x.o); }
+    sigs.sort((a, b) => (BigInt('0x' + a.o.slice(2)) < BigInt('0x' + b.o.slice(2)) ? -1 : 1));   // the Safe wants them by owner, ascending
+    const packed = '0x' + sigs.map(x => x.s).join('');
+    if (!confirm(`Execute: send ${(t.units / 1e6).toFixed(2)} USDG from the Safe to ${t.to}, with ${sigs.length} signature(s)?`)) return;
+    const data = '0x' + SEL.exec + encode(['address', 'uint', 'bytes', 'uint', 'uint', 'uint', 'uint', 'address', 'address', 'bytes'], [USDG, 0, t.data, 0, 0, 0, 0, ZERO, ZERO, packed]);
+    say('sendOut', 'Confirm in your wallet…');
+    const hash = await eth('eth_sendTransaction', [{ from: me, to: t.safe, data }]);
+    say('sendOut', `Sent: <a href="${explorer(hash)}" target="_blank" rel="noopener">${hash}</a>\nWaiting…`);
+    const rc = await waitReceipt(hash);
+    say('sendOut', rc.status === '0x1' ? `<span class="ok">Done.</span> <a href="${explorer(hash)}" target="_blank" rel="noopener">${hash}</a>` : `<span class="err">Failed on chain.</span> ${hash}`);
+    loadSafe();
+  } catch (e) { say('sendOut', `<span class="err">${e.message || e}</span>`); }
+};
+})();
+</script>
+</body>
+</html>

@@ -45,6 +45,7 @@ td.n,th.n{text-align:right;font-family:var(--m)}
 .addr{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 16px;border-radius:12px;background:#0b0b0e;box-shadow:inset 0 0 0 1px var(--line)}
 .addr code{font:500 14px var(--m);color:#fff;word-break:break-all}
 .addr a{margin-left:auto;font-size:14px;color:var(--green)}
+.addr{flex-direction:column;align-items:stretch}.addr .w{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.addr .w+.w{padding-top:12px;border-top:1px solid var(--line)}.addr .w span{flex-basis:100%;font:500 11px/1 var(--b);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 ol{padding-left:22px}li{margin:6px 0}
 .when{margin-top:28px;color:var(--muted);font:400 13px/1.5 var(--m)}
 .other{margin:-14px 0 34px;padding:14px 16px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted);font-size:14px;line-height:1.5}.other b{color:#fff;font-family:var(--m);font-weight:500}
@@ -68,7 +69,7 @@ ol{padding-left:22px}li{margin:6px 0}
 
   <section>
     <h2>The treasury, on chain</h2>
-    <p>Anyone can check this balance on the explorer: it is the only address deposits go to and withdrawals come from.</p>
+    <p>Anyone can check these balances on the explorer. Deposits go to the treasury; withdrawals are paid from the withdrawal wallet when there is one.</p>
     <div class="addr" id="addr"><code>…</code></div>
   </section>
 
@@ -107,7 +108,8 @@ ol{padding-left:22px}li{margin:6px 0}
     const oth = (d.otherAssets || []).filter(a => a.amount > 0);
     $('other').hidden = !oth.length;
     $('other').innerHTML = oth.map(a => `Also on the treasury: <b>${a.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${esc(a.asset)}</b>${a.usd ? ` (≈ ${usd(a.usd)})` : ''}. Not counted above: withdrawals are paid in USDG.`).join('<br>');
-    $('addr').innerHTML = `<code>${esc(d.treasury)}</code><a href="${esc(d.explorer)}/address/${esc(d.treasury)}" target="_blank" rel="noopener">View on explorer ↗</a>`;
+    const ws = d.wallets && d.wallets.length ? d.wallets : [{ role: 'treasury', address: d.treasury }];
+    $('addr').innerHTML = ws.map(w => `<div class="w"><span>${esc(w.role)}${w.usdg != null ? ` · ${usd(w.usdg)}` : ''}</span><code>${esc(w.address)}</code><a href="${esc(d.explorer)}/address/${esc(w.address)}" target="_blank" rel="noopener">View on explorer ↗</a></div>`).join('');
     $('rows').innerHTML = d.byAsset.length ? d.byAsset.map(a => `<tr><td>${esc(a.name)}</td><td class="n">${usd(a.usd)}</td></tr>`).join('') : '<tr><td colspan="2">No balances yet.</td></tr>';
     $('when').textContent = 'Last checked ' + new Date(d.checked).toLocaleString('en-GB') + ' · ' + d.chain + ' · USDG ' + d.usdgContract;
   }
