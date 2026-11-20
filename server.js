@@ -350,6 +350,13 @@ async function refundWithdrawal(id, status, from, error = null) {
 }
 // Owes: every balance at market price (USDG at $1) plus withdrawals not yet paid.
 // Holds: USDG on the treasury address and on the hot wallet, read on chain.
+let ethPx = { at: 0, usd: null };
+async function ethUsd() {
+  if (Date.now() - ethPx.at < 300_000) return ethPx.usd;
+  ethPx.at = Date.now();
+  try { const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', { signal: AbortSignal.timeout(5000) }); const j = await r.json(); const p = Number(j && j.ethereum && j.ethereum.usd); ethPx.usd = p > 0 ? p : ethPx.usd; } catch {}
+  return ethPx.usd;
+}
 let solv = { at: 0, data: null };
 async function solvency(force = false) {
   if (!force && solv.data && Date.now() - solv.at < 60_000) return solv.data;
@@ -371,15 +378,16 @@ async function solvency(force = false) {
   if (pos.length) { const k = await marks(prem);
     for (const x of pos) { const mk = k[x.model]; levOwed += (mk && mk.ready ? posValue(x, exitPx(x.side, mk)).value : Number(x.margin)) / 1e6; levWorst += posWorst(x) / 1e6; }
     owed += levOwed; atMarket += levOwed; atRef += levOwed; byAsset.push({ asset: 'leverage', name: 'Leveraged positions', units: pos.length, usd: levOwed }); }
-  let held = null, hotAddr = null, hotUsdg = null, treasuryUsdg = null, hotEth = null;
+  let held = null, hotAddr = null, hotUsdg = null, treasuryUsdg = null, hotEth = null, treasuryEth = null;
   if (LIVE) {
     const read = async a => Number(BigInt(await rpc('eth_call', [{ to: USDG_CONTRACT, data: '0x70a08231' + a.slice(2).toLowerCase().padStart(64, '0') }, 'latest']))) / 1e6;
     treasuryUsdg = await read(TREASURY); held = treasuryUsdg;
+    treasuryEth = Number(BigInt(await rpc('eth_getBalance', [TREASURY, 'latest']))) / 1e18;
     if (WD_ON) { hotAddr = hot().wallet.account.address;
       if (hotAddr.toLowerCase() !== TREASURY.toLowerCase()) { hotUsdg = await read(hotAddr); held += hotUsdg; } else hotUsdg = treasuryUsdg;
       hotEth = Number(BigInt(await rpc('eth_getBalance', [hotAddr, 'latest']))) / 1e18; }
   }
-  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, hotWallet: hotAddr, hotUsdg, hotEth, owed, levOwed, levWorst, levHeadroom: held == null ? null : held - (owed - levOwed) - levWorst, margin: held == null ? null : held - owed, ok: held == null || held >= owed - 1e-6, checked: new Date().toISOString() };
+  const data = { byAsset: byAsset.sort((a, b) => b.usd - a.usd), pendingWithdrawals: Number(pend.rows[0].n) / 1e6, owedAtMarket: atMarket, owedAtReference: atRef, usdgOwed, held, treasuryUsdg, treasuryEth, hotWallet: hotAddr, hotUsdg, hotEth, owed, levOwed, levWorst, levHeadroom: held == null ? null : held - (owed - levOwed) - levWorst, margin: held == null ? null : held - owed, ok: held == null || held >= owed - 1e-6, checked: new Date().toISOString() };
   if (!data.ok) console.error(`RESERVE ALERT: holds ${held.toFixed(2)} USDG, owes ${owed.toFixed(2)}. Withdrawals paused.`);
   solv = { at: Date.now(), data }; return data;
 }
@@ -549,7 +557,8 @@ async function api(req, res, p) {
       const d = await solvency();
       return send(res, 200, { live: true, chain: CHAIN.name, explorer: CHAIN.explorer, usdgContract: USDG_CONTRACT, treasury: TREASURY,
         held: d.held, owed: d.owed, owedAtMarket: d.owedAtMarket, owedAtReference: d.owedAtReference, pendingWithdrawals: d.pendingWithdrawals,
-        margin: d.margin, ratio: d.owed > 0 ? d.held / d.owed : null, ok: d.ok, byAsset: d.byAsset.map(({ asset, name, usd }) => ({ asset, name, usd })), checked: d.checked });
+        margin: d.margin, ratio: d.owed > 0 ? d.held / d.owed : null, ok: d.ok,
+        otherAssets: d.treasuryEth > 0 ? [{ asset: 'ETH', amount: d.treasuryEth, usd: (await ethUsd()) ? d.treasuryEth * ethPx.usd : null, counted: false }] : [], byAsset: d.byAsset.map(({ asset, name, usd }) => ({ asset, name, usd })), checked: d.checked });
     }
 
     // price history of one model, in USDG per million tokens. Rebuilt exactly from the ledger: the market price only

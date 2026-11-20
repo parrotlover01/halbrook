@@ -47,6 +47,7 @@ td.n,th.n{text-align:right;font-family:var(--m)}
 .addr a{margin-left:auto;font-size:14px;color:var(--green)}
 ol{padding-left:22px}li{margin:6px 0}
 .when{margin-top:28px;color:var(--muted);font:400 13px/1.5 var(--m)}
+.other{margin:-14px 0 34px;padding:14px 16px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted);font-size:14px;line-height:1.5}.other b{color:#fff;font-family:var(--m);font-weight:500}
 .off{padding:18px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);color:var(--muted)}
 @media (max-width:640px){.tiles{grid-template-columns:1fr}.top nav{gap:14px}}
 @media (prefers-reduced-motion:reduce){.kick i{animation:none}.bar i{transition:none}}
@@ -63,6 +64,7 @@ ol{padding-left:22px}li{margin:6px 0}
   <p class="lead">Every dollar players hold on Halbrook must be backed by real USDG on Robinhood Chain. This page compares the two, live: what the treasury holds on chain, against everything Halbrook owes.</p>
   <div class="bar" id="bar"><i></i></div>
   <div class="tiles" id="tiles"></div>
+  <div class="other" id="other" hidden></div>
 
   <section>
     <h2>The treasury, on chain</h2>
@@ -102,6 +104,9 @@ ol{padding-left:22px}li{margin:6px 0}
       <div class="tile"><span>Held on chain</span><b>${usd(d.held)}</b><small>USDG in the treasury</small></div>
       <div class="tile"><span>Owed to players</span><b>${usd(d.owed)}</b><small>what players could take out now${d.pendingWithdrawals ? `, incl. ${usd(d.pendingWithdrawals)} in withdrawals` : ''}</small></div>
       <div class="tile ${d.margin >= 0 ? 'pos' : 'neg'}"><span>${d.margin >= 0 ? 'Surplus' : 'Shortfall'}</span><b>${usd(Math.abs(d.margin))}</b><small>${d.margin >= 0 ? 'more held than owed' : 'withdrawals are paused'}</small></div>`;
+    const oth = (d.otherAssets || []).filter(a => a.amount > 0);
+    $('other').hidden = !oth.length;
+    $('other').innerHTML = oth.map(a => `Also on the treasury: <b>${a.amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${esc(a.asset)}</b>${a.usd ? ` (≈ ${usd(a.usd)})` : ''}. Not counted above: withdrawals are paid in USDG.`).join('<br>');
     $('addr').innerHTML = `<code>${esc(d.treasury)}</code><a href="${esc(d.explorer)}/address/${esc(d.treasury)}" target="_blank" rel="noopener">View on explorer ↗</a>`;
     $('rows').innerHTML = d.byAsset.length ? d.byAsset.map(a => `<tr><td>${esc(a.name)}</td><td class="n">${usd(a.usd)}</td></tr>`).join('') : '<tr><td colspan="2">No balances yet.</td></tr>';
     $('when').textContent = 'Last checked ' + new Date(d.checked).toLocaleString('en-GB') + ' · ' + d.chain + ' · USDG ' + d.usdgContract;
