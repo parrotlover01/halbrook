@@ -1692,7 +1692,7 @@ function renderLev() {
   // x5 on the flagship models, x2 on the others: the chips follow the selected model
   const mxX = m ? m.max : lev.min; if (lvX > mxX) lvX = mxX;
   const xs = []; for (let x = lev.min; x <= mxX; x++) xs.push(x);
-  if ($('lvX').dataset.k !== xs.join()) { $('lvX').dataset.k = xs.join(); $('lvX').innerHTML = xs.map(x => `<button type="button" data-x="${x}">x${x}</button>`).join('') + (xs.length === 1 ? '<span class="lv-cap">x5 on Claude Opus 5.5 and GPT-6 Astra</span>' : ''); }
+  if ($('lvX').dataset.k !== xs.join()) { $('lvX').dataset.k = xs.join(); $('lvX').innerHTML = xs.map(x => `<button type="button" data-x="${x}">x${x}</button>`).join('') + (xs.length === 1 && lev.max > lev.min ? `<span class="lv-cap">x${lev.max} on Claude Opus 5.5 and GPT-6 Astra</span>` : ''); }
   $('lvX').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.x === lvX));
   const u = me && me.balances.find(x => x.model === 'usdg'), have = u ? u.tokens / 1e6 : 0;
   $('lvHave').innerHTML = me ? `Balance: <b>$${have.toFixed(2)}</b>` + (have >= 1 ? ' <button type="button" class="tx-max">Max</button>' : '') : '';
@@ -1704,7 +1704,7 @@ function renderLev() {
   const per = v => v == null ? '—' : '$' + v.toFixed(v >= 10 ? 2 : 3) + ' / M';
   $('lvSum').innerHTML = `<span>Position size</span><b>${usd2(size)}</b><span>Entry price</span><b>${per(entry)}</b><span>Liquidated at</span><b>${liq == null ? '—' : liq <= 0 || (m && (liq < m.floor || liq > m.cap)) ? 'out of reach' : per(liq)}</b><span>Fee to open</span><b>${usd2(fee)}</b>`;
   $('lvGo').textContent = `${lvSide === 'long' ? 'Long' : 'Short'} ${name} x${lvX}`; $('lvGo').classList.toggle('long', lvSide === 'long');
-  if (!$('lvNote').dataset.msg) $('lvNote').textContent = m && !m.ready ? 'The mark price for this model is warming up. Back in a few minutes.' : `Mark price = average of the last ${lev.twapMin} min · ${(lev.openFee * 100).toFixed(1)}% to open and to close · ${(lev.feeHourly * 100).toFixed(2)}% per hour held · up to $${lev.marginMax} of margin`;
+  if (!$('lvNote').dataset.msg) $('lvNote').textContent = m && !m.ready ? 'The mark price for this model is warming up. Back in a few minutes.' : `Mark price = average of the last ${lev.twapMin >= 120 ? lev.twapMin / 60 + ' h' : lev.twapMin + ' min'} · ${(lev.openFee * 100).toFixed(1)}% to open and to close · ${(lev.feeHourly * 100).toFixed(2)}% per hour held · up to $${lev.marginMax} of margin`;
   const open = lvPositions.filter(x => x.status === 'open'), done = lvPositions.filter(x => x.status !== 'open').slice(0, 5);
   $('lvPos').innerHTML = (open.length ? '<h4>Open positions</h4>' + open.map(x => `<div class="lv-p"><span><b>${x.side === 'long' ? 'Long' : 'Short'} ${esc(x.name)} x${x.leverage}</b> · ${usd2(x.margin)} margin</span><button type="button" data-close="${esc(x.id)}">Close</button><span>${x.value == null ? 'Value pending' : `Worth <b>${usd2(x.value)}</b> <span class="${x.pnl >= 0 ? 'up' : 'dn'}">${x.pnl >= 0 ? '+' : ''}${usd2(x.pnl)}</span>`} · liq. ${per(x.liq)}</span></div>`).join('') : '')
     + (done.length ? '<h4>Recently closed</h4>' + done.map(x => `<div class="lv-p done"><span><b>${x.side === 'long' ? 'Long' : 'Short'} ${esc(x.name)} x${x.leverage}</b> · ${x.status === 'liquidated' ? 'liquidated' : 'closed'}</span><span>${usd2(x.margin)} in · ${usd2(x.payout || 0)} back</span></div>`).join('') : '');

@@ -31,7 +31,7 @@ const LIVE = !TEST_MODE && !!TREASURY;
 // earlier treasury addresses, kept during a move to a new one (e.g. a Safe): deposits sent there are still credited,
 // their USDG still counts in the reserves, and what they send to the new treasury is never mistaken for a deposit
 const LEGACY = (process.env.LEGACY_TREASURY_ADDRESSES || '').split(',').map(x => { try { return getAddress(x.trim()); } catch { return null; } })
-  .filter(a => a && (!TREASURY || a.toLowerCase() !== TREASURY.toLowerCase()));
+  .filter((a, i, all) => a && (!TREASURY || a.toLowerCase() !== TREASURY.toLowerCase()) && all.findIndex(b => b && b.toLowerCase() === a.toLowerCase()) === i);
 const WD_ON = LIVE && process.env.WITHDRAWALS_ENABLED === '1' && !!process.env.TREASURY_PRIVATE_KEY;
 const WD_MAX = Number.isFinite(Number(process.env.WITHDRAW_MAX_USD)) && Number(process.env.WITHDRAW_MAX_USD) > 0 ? Number(process.env.WITHDRAW_MAX_USD) : 100;              // per withdrawal
 const WD_DAILY = Number.isFinite(Number(process.env.WITHDRAW_DAILY_USD)) && Number(process.env.WITHDRAW_DAILY_USD) > 0 ? Number(process.env.WITHDRAW_DAILY_USD) : 200;          // per account, 24 h
@@ -50,13 +50,16 @@ const SITE_HOSTS = (process.env.SITE_HOSTS || 'www.halbrook.xyz,halbrook.xyz').s
 // Leverage stays off until the market can resist a pushed price: with no premium decay and thin depth, a premium can be
 // held at the band edge for the whole TWAP window for a few cents of fees. LEVERAGE_I_UNDERSTAND_THE_RISK=1 is required.
 const LEV_ON = process.env.LEVERAGE_ENABLED === '1' && process.env.LEVERAGE_I_UNDERSTAND_THE_RISK === '1';
-const LEV_MIN = 2, LEV_MAX = Math.min(5, Math.max(LEV_MIN, Number(process.env.LEVERAGE_MAX || 5)));
+const LEV_MIN = 2, LEV_MAX = Math.min(5, Math.max(LEV_MIN, Number(process.env.LEVERAGE_MAX || 2)));
 // flagship models go up to LEV_MAX, every other model (and every model added later) up to x2
 const LEV_FLAGSHIP = (process.env.LEVERAGE_FLAGSHIP || 'anthropic/claude-opus-5.5,openai/gpt-6-astra').split(',').map(x => x.trim()).filter(Boolean);
 const levMaxOf = m => LEV_FLAGSHIP.includes(m) ? LEV_MAX : LEV_MIN;
 const LEV_MARGIN_MAX = Number(process.env.LEVERAGE_MARGIN_MAX_USD || 20);   // USDG of margin per position, at most
 const LEV_OI_MAX = Number(process.env.LEVERAGE_OI_MAX_USD || 100);          // open size per model and side, USD
-const LEV_TWAP_MIN = Number(process.env.LEVERAGE_TWAP_MIN || 15);           // mark price: average market price over this many minutes
+const LEV_OI_TOTAL = Number(process.env.LEVERAGE_OI_TOTAL_USD || 100);      // open size across every model and side, USD
+const LEV_GAP = Number(process.env.LEVERAGE_MAX_GAP || 0.03);               // opens only while spot and mark agree within this
+const LEV_PREM_MAX = Number(process.env.LEVERAGE_MAX_PREMIUM || 0.10);      // opens only while the premium is within this
+const LEV_TWAP_MIN = Math.max(15, Number(process.env.LEVERAGE_TWAP_MIN) || 240);           // mark price: average market price over this many minutes
 const LEV_FEE_H = Number(process.env.LEVERAGE_FEE_HOURLY || 0.0001);        // holding fee per hour, share of the size (0.01%)
 const LEV_MAINT = 0.10;                                                     // liquidated once worth 10% of the margin or less                          // the public API (/v1 and API keys) is off until a later update             // flat fee per withdrawal, covers gas
 
@@ -94,6 +97,7 @@ async function migrate() {
   await db.query("ALTER TABLE balances ADD CONSTRAINT balances_sane CHECK (amount >= 0 AND amount <> 'NaN')").catch(() => {});
   await db.query('INSERT INTO market (model) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING', [MODELS]);
   if (LIVE) { await goLive(); await voidSelfDeposits(); }
+  await loadPaused();
 }
 async function voidSelfDeposits() {
   OWN.add(TREASURY.toLowerCase()); for (const a of LEGACY) OWN.add(a.toLowerCase());
@@ -132,15 +136,21 @@ async function goLive() {
   }
   liveReady = true;
 }
+async function loadPaused() {
+  const r = (await db.query("SELECT value FROM settings WHERE key = 'paused_models'")).rows[0];
+  for (const m of (r ? r.value : '').split(',')) if (MODELS.includes(m)) PAUSED.add(m);
+}
 
 /* ---------- live prices (OpenRouter public API), USD per token ---------- */
 let PRICES = {};
+const PAUSED = new Set();   // models whose trading is paused after an outsized price list change
 async function refreshPrices() {
   try {
     const r = await fetch('https://openrouter.ai/api/v1/models'); if (!r.ok) return;
     const all = (await r.json()).data, next = {};
     for (const m of all) if (MODELS.includes(m.id)) {
       const pin = +m.pricing.prompt || 0, pout = +m.pricing.completion || 0;
+      if (!(pin > 0 && pout > 0)) continue;
       next[m.id] = { name: String(m.name || m.id).replace(/^[^:]+:\s*/, '').replace(/[<>"'&`]/g, '').slice(0, 60), pin, pout, blend: (3 * pin + pout) / 4 };
     }
     if (Object.keys(next).length) { PRICES = { ...PRICES, ...next }; await anchorMarket().catch(e => console.error('anchor', e.message)); }
@@ -159,7 +169,8 @@ async function anchorMarket() {
       const old = r.ref == null ? null : Number(r.ref);
       if (old == null) { await c.query('UPDATE market SET ref = $2 WHERE model = $1', [r.model, P.blend]); continue; }
       if (Math.abs(old - P.blend) / P.blend < 1e-9) continue;
-      const p0 = clampP(decayed(r.premium, r.updated)), p1 = clampP(old * (1 + p0) / P.blend - 1);
+      const p0 = clampP(decayed(r.premium, r.updated)), raw = old * (1 + p0) / P.blend - 1, p1 = clampP(raw);
+      if (Math.abs(raw) > BAND + 1e-9 && !PAUSED.has(r.model)) { PAUSED.add(r.model); await c.query("INSERT INTO settings (key, value) VALUES ('paused_models', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [[...PAUSED].join(',')]); console.error('MARKET PAUSED', r.model, 'price list moved', old, '->', P.blend); }
       await c.query('UPDATE market SET premium = $2, ref = $3, updated = now() WHERE model = $1', [r.model, p1, P.blend]);
       await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ('*', 'reprice', $1, 0, $2)", [r.model, JSON.stringify({ refFrom: old, refTo: P.blend, premFrom: p0, premTo: p1 })]);
       console.log('reprice', r.model, old, '->', P.blend, 'premium', p0.toFixed(4), '->', p1.toFixed(4));
@@ -206,26 +217,43 @@ const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 /* ---------- metered calls: reserve the worst case, call, then settle the real cost ---------- */
 // Reserving up front (atomically) means no one can spend more than they hold, even with
 // many requests in parallel; the unused part goes back to the balance when the answer is in.
+// requests not settled yet: how many per account, and the USD they reserved (counted in the daily caps)
+const holding = { all: 0, by: new Map(), n: new Map() };
 async function reserve(user, model, messages, maxOut) {
   const P = priceOf(model); if (!P) return { code: 400, error: 'Unknown model' };
+  if ((holding.n.get(user) || 0) >= 4) return { code: 429, error: 'Four requests at a time per account' };
+  holding.n.set(user, (holding.n.get(user) || 0) + 1);   // taken before any await, so parallel requests see it
+  const h = await reserveInner(user, model, messages, maxOut, P).catch(e => { unhold({ user, usd: 0 }); throw e; });
+  if (h.error) unhold({ user, usd: 0 }); return h;
+}
+function unhold(h) {
+  if (h.freed) return; h.freed = true;
+  const n = (holding.n.get(h.user) || 1) - 1; if (n > 0) holding.n.set(h.user, n); else holding.n.delete(h.user);
+  holding.all = Math.max(0, holding.all - (h.usd || 0));
+  const b = (holding.by.get(h.user) || 0) - (h.usd || 0); if (b > 1e-9) holding.by.set(h.user, b); else holding.by.delete(h.user);
+}
+async function reserveInner(user, model, messages, maxOut, P) {
   const spent = await db.query("SELECT COALESCE(SUM((meta->>'paid')::numeric), 0) AS usd FROM ledger WHERE kind = 'chat' AND ts > now() - interval '1 day'");
-  if (Number(spent.rows[0].usd) >= CHAT_DAILY_USD) return { code: 503, error: 'Halbrook has reached its daily usage limit. Back tomorrow.' };
+  if (Number(spent.rows[0].usd) + holding.all >= CHAT_DAILY_USD) return { code: 503, error: 'Halbrook has reached its daily usage limit. Back tomorrow.' };
   const mine = await db.query("SELECT COALESCE(SUM((meta->>'paid')::numeric), 0) AS usd FROM ledger WHERE kind = 'chat' AND address = $1 AND ts > now() - interval '1 day'", [user]);
-  if (Number(mine.rows[0].usd) >= CHAT_USER_DAILY_USD) return { code: 429, error: `Daily limit for this account reached ($${CHAT_USER_DAILY_USD}). Back tomorrow.` };
-  const text = JSON.stringify(messages), ascii = text.replace(/[^\x20-\x7e]/g, '').length;
-  const tokensIn = Math.ceil(ascii / 3 + (text.length - ascii) * 1.5);   // plain text ~3 chars a token, dense text up to 1.5 tokens a char
+  if (Number(mine.rows[0].usd) + (holding.by.get(user) || 0) >= CHAT_USER_DAILY_USD) return { code: 429, error: `Daily limit for this account reached ($${CHAT_USER_DAILY_USD}). Back tomorrow.` };
+  const text = JSON.stringify(messages), ascii = text.replace(/[^\x20-\x7e]/g, '').length, digits = text.replace(/[^0-9]/g, '').length;
+  // plain text ~3 chars a token, digits up to 1 token each, dense text up to 1.5 tokens a char
+  const tokensIn = Math.ceil((ascii - digits) / 3 + digits + (text.length - ascii) * 1.5);
+  if (tokensIn > 150_000) return { code: 413, error: 'This conversation is too long. Start a new one.' };
   // long prompt, full answer, host up to 25% above the official price, plus the margin
   const worstUsd = (tokensIn * P.pin + maxOut * P.pout) * 1.25 * (1 + MARGIN);
   // pay with this model's tokens if you hold enough, otherwise straight from your USDG at the real cost
   for (const [payIn, unit, min] of [[model, P.blend, 2000], [USDG, 1e-6, 10_000]]) {
     const hold = Math.max(min, Math.ceil(worstUsd / unit));
     const { rowCount } = await db.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2 AND amount >= $3', [user, payIn, hold]);
-    if (rowCount) return { user, model, P, payIn, unit, hold };
+    if (rowCount) { holding.all += worstUsd; holding.by.set(user, (holding.by.get(user) || 0) + worstUsd); return { user, model, P, payIn, unit, hold, usd: worstUsd }; }
   }
   return { code: 402, error: 'Not enough tokens for this model, and not enough USDG. Deposit USDG or swap some first.' };
 }
-async function release(h) { await db.query('UPDATE balances SET amount = amount + $3 WHERE address = $1 AND model = $2', [h.user, h.payIn, h.hold]); }
+async function release(h) { unhold(h); await db.query('UPDATE balances SET amount = amount + $3 WHERE address = $1 AND model = $2', [h.user, h.payIn, h.hold]); }
 async function settle(h, usage, provider, meta) {
+  unhold(h);
   const u = usage || {}, pin = u.prompt_tokens || 0, pout = u.completion_tokens || 0, P = h.P, unknown = !pin && !pout && typeof u.cost !== 'number';
   if (unknown) console.error('chat: the host reported no usage, billing the reservation', h.user, h.model);
   const refCost = pin * P.pin + pout * P.pout;                                  // what the official price would charge
@@ -388,7 +416,7 @@ async function solvency(force = false) {
     treasuryUsdg = await read(TREASURY); held = treasuryUsdg;
     treasuryEth = Number(BigInt(await rpc('eth_getBalance', [TREASURY, 'latest']))) / 1e18;
     const counted = new Set([TREASURY.toLowerCase()]);
-    for (const a of LEGACY) { const u = await read(a); legacyUsdg.push({ address: a, usdg: u }); held += u; counted.add(a.toLowerCase()); }
+    for (const a of LEGACY) { if (counted.has(a.toLowerCase())) continue; const u = await read(a); legacyUsdg.push({ address: a, usdg: u }); held += u; counted.add(a.toLowerCase()); }
     if (WD_ON) { hotAddr = hot().wallet.account.address;
       if (!counted.has(hotAddr.toLowerCase())) { hotUsdg = await read(hotAddr); held += hotUsdg; } else hotUsdg = hotAddr.toLowerCase() === TREASURY.toLowerCase() ? treasuryUsdg : (legacyUsdg.find(x => x.address.toLowerCase() === hotAddr.toLowerCase()) || {}).usdg;
       hotEth = Number(BigInt(await rpc('eth_getBalance', [hotAddr, 'latest']))) / 1e18; }
@@ -552,6 +580,7 @@ async function api(req, res, p) {
       if (overLimit('quote:' + ipOf(req), 240, 60_000)) return send(res, 429, { error: 'Slow down a little' });
       const u = new URL(req.url, 'http://x'), amt = Math.floor(Number(u.searchParams.get('tokens')));
       if (!Number.isSafeInteger(amt) || amt <= 0 || amt > 1e12) return send(res, 400, { error: 'Bad amount' });
+      if (PAUSED.has(from) || PAUSED.has(to)) return send(res, 503, { error: 'Trading on this model is paused while its new price is checked. Back soon.' });
       const q = quote(u.searchParams.get('from'), u.searchParams.get('to'), amt, await premiums());
       return q ? send(res, 200, q) : send(res, 400, { error: 'Pick two different models' });
     }
@@ -655,6 +684,12 @@ async function api(req, res, p) {
       const h = req.headers.authorization || '', t = Buffer.from(h.startsWith('Bearer ') ? h.slice(7) : ''), k = Buffer.from(ADMIN_TOKEN);
       if (ADMIN_TOKEN.length < 24 || t.length !== k.length || !crypto.timingSafeEqual(t, k)) return send(res, 401, { error: 'Not allowed' });
       if (p === '/api/admin/solvency' && req.method === 'GET') return send(res, 200, await solvency(true));
+      if (p === '/api/admin/paused' && req.method === 'GET') return send(res, 200, { paused: [...PAUSED] });
+      if (p === '/api/admin/resume' && req.method === 'POST') {
+        const { model } = await readJSON(req); if (!PAUSED.delete(model)) return send(res, 404, { error: 'Not paused' });
+        await db.query("INSERT INTO settings (key, value) VALUES ('paused_models', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [[...PAUSED].join(',')]);
+        return send(res, 200, { paused: [...PAUSED] });
+      }
       if (p === '/api/admin/withdrawals' && req.method === 'GET') {
         const { rows } = await db.query("SELECT id, address, amount, status, tx_hash, error, created FROM withdrawals WHERE status IN ('review', 'queued', 'sending', 'sent', 'unknown') ORDER BY id");
         return send(res, 200, { withdrawals: rows.map(w => ({ ...w, id: String(w.id), usdg: Number(w.amount) / 1e6 })) });
@@ -745,12 +780,13 @@ async function api(req, res, p) {
       const PF = assetPrice(from), PT = assetPrice(to);
       if (!PF || !PT || from === to) return send(res, 400, { error: 'Pick two different assets' });
       if (!Number.isSafeInteger(amt) || amt <= 0 || amt > 1e12) return send(res, 400, { error: 'Bad amount' });
+      if (PAUSED.has(from) || PAUSED.has(to)) return send(res, 503, { error: 'Trading on this model is paused while its new price is checked. Back soon.' });
       const c = await db.connect();
       try {
         await c.query('BEGIN');
         const prem = await premiums(c, [from, to].filter(x => x !== USDG));   // locks the market rows that move
         const q = quote(from, to, amt, prem);
-        if (!q || !Number.isSafeInteger(q.out) || q.out < 1) { await c.query('ROLLBACK'); return send(res, 400, { error: 'Amount too small' }); }
+        if (!q || !Number.isSafeInteger(q.out) || q.out < 1 || q.valueUsd < 0.01) { await c.query('ROLLBACK'); return send(res, 400, { error: 'Amount too small' }); }
         const { rows } = await c.query('SELECT amount FROM balances WHERE address = $1 AND model = $2 FOR UPDATE', [user, from]);
         if (!rows.length || Number(rows[0].amount) < amt) { await c.query('ROLLBACK'); return send(res, 400, { error: 'Not enough tokens' }); }
         await c.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2', [user, from, amt]);
@@ -760,7 +796,7 @@ async function api(req, res, p) {
         const meta = JSON.stringify({ to, out: q.out, valueUsd: q.valueUsd, fee: SWAP_FEE, premFrom: [q.from.premium, q.from.after], premTo: [q.to.premium, q.to.after] });
         await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'swap',$2,$3,$4)", [user, from, -amt, meta]);
         await c.query('COMMIT');
-        chartCache.clear();   // the new trade shows on the charts right away
+        for (const k of chartCache.keys()) if (k.startsWith(from + ':') || k.startsWith(to + ':')) chartCache.delete(k);   // the new trade shows on its charts right away
         return send(res, 200, { gave: amt, got: q.out, quote: q, balances: await balances(user) });
       } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
     }
@@ -786,6 +822,8 @@ async function api(req, res, p) {
       const size = m * lev, feeOpen = Math.ceil(size * SWAP_FEE);
       const k = (await marks(await premiums()))[model];
       if (!k || !k.ready) return send(res, 503, { error: 'The mark price for this model is still warming up. Try again in a few minutes.' });
+      if (Math.abs(k.spot / k.mark - 1) > LEV_GAP) return send(res, 503, { error: 'This market is moving fast right now. Try again later.' });
+      if (Math.abs((await premiums())[model] || 0) > LEV_PREM_MAX) return send(res, 503, { error: 'This model is trading far from its reference price. Positions open again once it settles.' });
       const entry = entryPx(side, k), worst = posWorst({ model, side, margin: m, size, entry });
       const c = await db.connect();
       try {
@@ -797,6 +835,8 @@ async function api(req, res, p) {
         }
         const oi = await c.query("SELECT COALESCE(SUM(size), 0) AS s FROM positions WHERE status = 'open' AND model = $1 AND side = $2", [model, side]);
         if (Number(oi.rows[0].s) + size > LEV_OI_MAX * 1e6) { await c.query('ROLLBACK'); return send(res, 400, { error: `This market is full on the ${side} side for now. Try a smaller size.` }); }
+        const tot = await c.query("SELECT COALESCE(SUM(size), 0) AS s FROM positions WHERE status = 'open'");
+        if (Number(tot.rows[0].s) + size > LEV_OI_TOTAL * 1e6) { await c.query('ROLLBACK'); return send(res, 400, { error: 'Open positions are full for now. Try a smaller size or come back later.' }); }
         const b = await c.query('SELECT amount FROM balances WHERE address = $1 AND model = $2 FOR UPDATE', [user, USDG]);
         if (!b.rows.length || Number(b.rows[0].amount) < m + feeOpen) { await c.query('ROLLBACK'); return send(res, 400, { error: `Not enough USDG: you need ${((m + feeOpen) / 1e6).toFixed(2)} with the fee` }); }
         await c.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2', [user, USDG, m + feeOpen]);
