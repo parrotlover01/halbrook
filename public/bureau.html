@@ -1749,9 +1749,9 @@ function drawInto(el, k) {
   const t0 = d.from, t1 = d.to, px = P.map(p => p[1]), rf = P.map(p => p[2]);
   let lo = Math.min(...px, ...rf), hi = Math.max(...px, ...rf); const pad = Math.max((hi - lo) * 0.12, hi * 0.004); lo -= pad; hi += pad;
   const X = t => (t - t0) / Math.max(1, t1 - t0) * pw, Y = v => T + (hi - v) / (hi - lo) * ph;
-  // step line: a price holds until the next trade
+  // step line: a price jumps at each trade; between trades it glides back toward the reference (6th field)
   let path = `M${X(P[0][0]).toFixed(1)},${Y(P[0][1]).toFixed(1)}`;
-  for (let i = 1; i < P.length; i++) path += `H${X(P[i][0]).toFixed(1)}V${Y(P[i][1]).toFixed(1)}`;
+  for (let i = 1; i < P.length; i++) path += P[i][5] ? `L${X(P[i][0]).toFixed(1)},${Y(P[i][1]).toFixed(1)}` : `H${X(P[i][0]).toFixed(1)}V${Y(P[i][1]).toFixed(1)}`;
   const first = P[0][1], last = P[P.length - 1][1], up = last >= first, col = up ? '#3ccf8e' : '#ef5a6f', chg = (last - first) / first * 100;
   const area = path + `H${X(t1).toFixed(1)}V${T + ph}H${X(P[0][0]).toFixed(1)}Z`;
   const fmt = v => '$' + (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(2) : v.toFixed(3));
@@ -1776,7 +1776,7 @@ function drawInto(el, k) {
     // snap to a trade dot when the cursor is on one
     let near = -1, nd = 7; for (let i = 0; i < P.length; i++) if (P[i][3]) { const dd = Math.abs(X(P[i][0]) - x); if (dd < nd) { nd = dd; near = i; } }
     if (near >= 0) j = near;
-    const v = P[j][1], y = Y(v); g.style.display = ''; $('tvXl' + k).setAttribute('x1', x); $('tvXl' + k).setAttribute('x2', x); $('tvXc' + k).setAttribute('cx', x); $('tvXc' + k).setAttribute('cy', y);
+    const nx = P[j + 1], v = near < 0 && nx && nx[5] && nx[0] > P[j][0] ? P[j][1] + (nx[1] - P[j][1]) * (t - P[j][0]) / (nx[0] - P[j][0]) : P[j][1], y = Y(v); g.style.display = ''; $('tvXl' + k).setAttribute('x1', x); $('tvXl' + k).setAttribute('x2', x); $('tvXc' + k).setAttribute('cx', x); $('tvXc' + k).setAttribute('cy', y);
     tip.hidden = false; tip.style.left = Math.max(48, Math.min(r.width - 48, x * r.width / W)) + 'px';
     const hitT = near >= 0 ? P[near] : null;
     tip.innerHTML = (hitT ? `<em class="tv-side ${hitT[3] > 0 ? 'up' : 'dn'}">${hitT[3] > 0 ? 'Buy' : 'Sell'}${hitT[4] ? ' · you' : ''}</em> ` : '') + `${fmt(v)} / M<small>${new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>`; };

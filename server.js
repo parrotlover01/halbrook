@@ -615,29 +615,39 @@ async function api(req, res, p) {
         // reference at any time: walking back from today, each reprice tells what it was before
         const reps = rows.filter(r => r.kind === 'reprice'), refAt = t => { const n = reps.find(r => new Date(r.ts).getTime() > t); return n ? Number(n.meta.refFrom) : priceOf(model).blend; };
         const now = Date.now(), start = SPAN[range] ? Math.max(t0, now - SPAN[range]) : t0;
-        let prem = 0, ref = refAt(t0); const pts = [];   // walk every event in order
+        // every change of state in order: [time, premium, reference, side, who]
+        let prem = 0, ref = refAt(t0); const ev = [];
         for (const r of rows) {
           const t = new Date(r.ts).getTime(), m = r.meta || {}; let side = 0;
           if (r.kind === 'reprice') { prem = Number(m.premTo); ref = Number(m.refTo); }
           else if (r.model === model && Array.isArray(m.premFrom)) { prem = Number(m.premFrom[1]); side = -1; }   // sold this model
           else if (Array.isArray(m.premTo)) { prem = Number(m.premTo[1]); side = 1; }                              // bought it
           else continue;
-          if (t < start) continue;   // only the last state before the window counts
-          pts.push([t, ref * (1 + prem) * 1e6, ref * 1e6, side, side ? r.address : null]);
+          ev.push([t, prem, ref, side, side ? r.address : null]);
         }
-        // the window opens at the state the last event before it left
-        let pr = 0, rf = refAt(t0);
-        for (const r of rows) { if (new Date(r.ts).getTime() >= start) break; const m = r.meta || {};
-          if (r.kind === 'reprice') { pr = Number(m.premTo); rf = Number(m.refTo); } else if (r.model === model && Array.isArray(m.premFrom)) pr = Number(m.premFrom[1]); else if (Array.isArray(m.premTo)) pr = Number(m.premTo[1]); }
-        const live = await premiums(), cur = [now, levPx(model, live) * 1e6, priceOf(model).blend * 1e6, 0, null];
-        let series = [[start, rf * (1 + pr) * 1e6, rf * 1e6, 0, null], ...pts, cur];
-        if (series.length > 800) { const step = series.length / 800; series = Array.from({ length: 800 }, (_, i) => series[Math.min(series.length - 1, Math.round(i * step))]).concat([cur]); }
-        hit = { at: Date.now(), from: start, to: now, trades: pts.length, series: series.map(([t, px, r2, side, who]) => [t, +px.toFixed(6), +r2.toFixed(6), side, who]) };
+        // between two trades the premium fades back toward the reference (half-life), drawn as a glide (6th field = 1)
+        const HL = HALF_LIFE_H * 36e5, pAt = (e, t) => HL > 0 ? e[1] * Math.pow(0.5, (t - e[0]) / HL) : e[1];
+        const gap = Math.max((now - start) / 300, 5 * 60_000), pts = [], glide = [];
+        const slide = (e, to) => { if (!(HL > 0) || Math.abs(e[1]) < 1e-5) return;
+          for (let t = Math.max(start, e[0]) + gap; t < to; t += gap) { const q = pAt(e, t); glide.push([t, e[2] * (1 + q) * 1e6, e[2] * 1e6, 0, null, 1]); if (Math.abs(q) < 1e-5) break; }
+          glide.push([to, e[2] * (1 + pAt(e, to)) * 1e6, e[2] * 1e6, 0, null, 1]); };
+        let cur = [start, 0, refAt(t0), 0, null];   // the window opens at the state the last event before it left
+        for (const e of ev) if (e[0] < start) cur = e; else break;
+        const open = [start, cur[2] * (1 + pAt(cur, start)) * 1e6, cur[2] * 1e6, 0, null];
+        for (const e of ev) { if (e[0] < start) continue; slide(cur, e[0]); pts.push([e[0], e[2] * (1 + e[1]) * 1e6, e[2] * 1e6, e[3], e[4]]); cur = e; }
+        slide(cur, now);
+        const live = await premiums(), last = [now, levPx(model, live) * 1e6, priceOf(model).blend * 1e6, 0, null, HL > 0 ? 1 : 0];
+        if (glide.length && glide[glide.length - 1][0] === now) glide.pop();
+        let body = [...pts, ...glide].sort((x, y) => x[0] - y[0] || (x[5] ? -1 : 0) - (y[5] ? -1 : 0));   // at a trade, the glide lands first, then the jump
+        if (body.length > 800) { const keep = new Set(pts.length > 800 ? pts.filter((_, i) => i % Math.ceil(pts.length / 800) === 0) : pts); const step = Math.ceil(glide.length / Math.max(1, 800 - keep.size));
+          body = body.filter(p => keep.has(p) || (p[5] && glide.indexOf(p) % step === 0)); }
+        const series = [open, ...body, last];
+        hit = { at: Date.now(), from: start, to: now, trades: pts.length, series: series.map(([t, px, r2, side, who, gl]) => [t, +px.toFixed(6), +r2.toFixed(6), side, who, gl ? 1 : 0]) };
         chartCache.set(key, hit);
       }
       const mine = me ? me.toLowerCase() : null;
       return send(res, 200, { model, name: priceOf(model).name, range, from: hit.from, to: hit.to, trades: hit.trades,
-        points: hit.series.map(([t, px, rf, side, who]) => [t, px, rf, side, mine && who && who.toLowerCase() === mine ? 1 : 0]) });
+        points: hit.series.map(([t, px, rf, side, who, gl]) => [t, px, rf, side, mine && who && who.toLowerCase() === mine ? 1 : 0, gl]) });
     }
 
     if (p === '/api/leverage' && req.method === 'GET') {
