@@ -694,6 +694,21 @@ async function api(req, res, p) {
       const h = req.headers.authorization || '', t = Buffer.from(h.startsWith('Bearer ') ? h.slice(7) : ''), k = Buffer.from(ADMIN_TOKEN);
       if (ADMIN_TOKEN.length < 24 || t.length !== k.length || !crypto.timingSafeEqual(t, k)) return send(res, 401, { error: 'Not allowed' });
       if (p === '/api/admin/solvency' && req.method === 'GET') return send(res, 200, await solvency(true));
+      // the owner's own player balance becomes house margin: taken off that account, recorded in the ledger, nothing moves on chain
+      if (p === '/api/admin/to-house' && req.method === 'POST') {
+        const b = await readJSON(req); let a; try { a = getAddress(String(b.address || '')); } catch { return send(res, 400, { error: 'Bad address' }); }
+        const amt = Math.round(Number(b.amount) * 1e6); if (!Number.isSafeInteger(amt) || amt <= 0) return send(res, 400, { error: 'Bad amount' });
+        const c = await db.connect();
+        try {
+          await c.query('BEGIN');
+          const r = await c.query('SELECT address, amount FROM balances WHERE lower(address) = lower($1) AND model = $2 FOR UPDATE', [a, USDG]);
+          if (!r.rows.length || Number(r.rows[0].amount) < amt) { await c.query('ROLLBACK'); return send(res, 400, { error: 'Not enough USDG on that account', balance: r.rows.length ? Number(r.rows[0].amount) / 1e6 : 0 }); }
+          await c.query('UPDATE balances SET amount = amount - $3 WHERE address = $1 AND model = $2', [r.rows[0].address, USDG, amt]);
+          await c.query("INSERT INTO ledger (address, kind, model, amount, meta) VALUES ($1,'to-house',$2,$3,$4)", [r.rows[0].address, USDG, -amt, JSON.stringify({ note: 'owner balance moved to house margin' })]);
+          await c.query('COMMIT');
+        } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
+        return send(res, 200, { moved: amt / 1e6, reserves: await solvency(true) });
+      }
       if (p === '/api/admin/paused' && req.method === 'GET') return send(res, 200, { paused: [...PAUSED] });
       if (p === '/api/admin/resume' && req.method === 'POST') {
         const { model } = await readJSON(req); if (!PAUSED.delete(model)) return send(res, 404, { error: 'Not paused' });
