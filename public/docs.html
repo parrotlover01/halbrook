@@ -56,14 +56,14 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
 </header>
 <div class="wrap">
   <aside class="toc" aria-label="Chapters"><b>Chapters</b>
-    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#chat">4. Aggregator and API</a><a href="#fees">5. Fees</a><a href="#film">6. The film</a><a href="#faq">7. Safety and FAQ</a>
+    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#leverage">4. Leverage</a><a href="#chat">5. Aggregator and API</a><a href="#fees">6. Fees</a><a href="#film">7. The film</a><a href="#faq">8. Safety and FAQ</a>
   </aside>
   <main>
     <h1>Halbrook Docs</h1>
-    <p class="lead">Everything you need to use Halbrook, in a five-minute read.</p>
+    <p class="lead">Everything you need to use Halbrook, in a six-minute read.</p>
 
     <section id="what"><h2><span>1</span>What is Halbrook</h2>
-      <p>Halbrook is an exchange for AI models: one wallet, one balance in USDG, every major model. Buy tokens of the models you believe in at the market price, swap between them, and use them in the Aggregator or through the API, where each request goes to the cheapest host.</p>
+      <p>Halbrook is an exchange for AI models: one wallet, one balance in USDG, every major model. Buy tokens of the models you believe in at the market price, swap between them, go long or short with leverage, and use them in the Aggregator or through the API, where each request goes to the cheapest host.</p>
       <div class="steps"><div><i>01</i><b>Connect wallet</b><small>sign in, free</small></div><div><i>02</i><b>Deposit USDG</b><small>on Robinhood Chain</small></div><div><i>03</i><b>Trade</b><small>at the market price</small></div><div><i>04</i><b>Use</b><small>Aggregator or API</small></div></div>
       <p>Prices are real and public. They come from the hosts themselves and refresh every 60 seconds.</p>
       <p>Models available today: Claude Opus 5.5, Claude Fable 5.2, GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, Gemini 4 Neon, Gemini 4 Carbon, Mistral Large 4, DeepSeek V4 Pro and Grok 4.7.</p>
@@ -81,13 +81,26 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
       <ol><li>Pick what you give and what you get. Each list shows your balance of every asset, USDG first.</li><li>Enter an amount: in dollars when you give USDG, otherwise in tokens, written like the result: <strong>1M</strong>, <strong>500K</strong>, <strong>2.5M</strong>. <strong>Max</strong> fills in all you hold.</li><li>Check what you will receive, then click <strong>Swap</strong>.</li></ol>
       <p>Each model has two prices:</p>
       <ul><li><strong>Reference</strong>: the real cost of using the model, from the hosts. It refreshes every 60 seconds. When a host changes its price, the market price stays where it was and the premium absorbs the change.</li><li><strong>Market</strong>: what the model trades at on Halbrook. Swaps into a model push it up, swaps out push it down.</li></ul>
-      <p>The gap between the two is the <strong>premium</strong>. It always stays between −30% and +30% of the reference and only moves with trades: when you sell high, it is because other players bought after you. Buy a model before the hype, swap out when its premium is high.</p>
+      <p>The gap between the two is the <strong>premium</strong>. It always stays between −30% and +30% of the reference. Trades move it: buying pushes it up, selling pushes it down. Between trades it <strong>fades back toward the reference</strong>, losing half of its gap every 6 hours. A model pushed to +20% is at about +10% six hours later if nobody trades it, and close to its reference after a day. So a premium only lasts while players keep buying: buy before the hype, swap out while the premium is high.</p>
       <p>Using your tokens, in the Aggregator or through the API, always counts them at the reference price. So a model trading below its reference is a bargain to use: that is its floor.</p>
-      <p>Big swaps move the premium more, and you pay the average price along the way. Before you confirm, the Exchange shows the premium after your swap. Fee: 0.3%.</p>
-      <p>The market table lists each model's reference price, market price, premium and cheapest host. Click a row to see where it sits in the band and every host with its price.</p>
+      <p>Big swaps move the premium more, and you pay the average price along the way: about 1 point of premium for every $10 swapped, so a $100 swap moves it by about 10 points. The part of an order that would go past the ±30% band trades at the edge price. Before you confirm, the Exchange shows the premium after your swap. Fee: 0.3%, and a swap must be worth at least $0.01.</p>
+      <p>If a host changes a model's official price by more than the band can absorb, trading on that model pauses while the new price is checked, then resumes.</p>
+      <p>The market table lists each model's reference price, market price, premium and cheapest host. Click a model to open its chart: the market price over 1 day, 1 week, 1 month or all time, the reference line, a dot for every trade (green buy, red sell, yours bigger) and the slow glide back toward the reference between trades.</p>
     </section>
 
-    <section id="chat"><h2><span>4</span>Aggregator and API: every model</h2>
+    <section id="leverage"><h2><span>4</span>Leverage: go long or short</h2>
+      <p>Leverage lets you bet on a model's price going up (<strong>long</strong>) or down (<strong>short</strong>) with more exposure than your margin. Your margin is in USDG, and you never hold the model's tokens.</p>
+      <ol><li>In the <a href="/app#market">Exchange</a>, open the <strong>Leverage</strong> tab next to Swap.</li><li>Pick a model, then <strong>Long</strong> or <strong>Short</strong>.</li><li>Enter your margin in USDG and pick the multiplier. Before you confirm, you see the entry price, the liquidation price and the fees.</li><li>Click <strong>Open long</strong> or <strong>Open short</strong>. Your position appears below, with its live value and a <strong>Close</strong> button.</li></ol>
+      <div class="steps"><div><i>x2</i><b>Every model</b><small>at launch</small></div><div><i>20</i><b>USDG margin</b><small>at most per position</small></div><div><i>4h</i><b>Mark price</b><small>average of the market price</small></div><div><i>10%</i><b>Liquidation</b><small>margin left</small></div></div>
+      <p><strong>Example.</strong> You open a long on Claude Opus 5.5 with 10 USDG at x2: a 20 USDG position. If the mark price rises 10%, you gain 2 USDG; if it falls 10%, you lose 2 USDG. Fees come on top.</p>
+      <p><strong>The mark price.</strong> Positions follow a <strong>mark price</strong>: the average of the model's market price over the last 4 hours, sampled every minute. One big trade cannot wipe anyone out or hand anyone a win. You open and close at the more conservative of the live market price and the mark price. When leverage has just been switched on, the mark price needs about 80 minutes of samples before positions can open: the tab shows “warming up” until then.</p>
+      <p><strong>When positions can open.</strong> Only while the market is calm: the live price and the mark price must agree within 3%, and the model must trade within 10% of its reference price. Otherwise, wait for it to settle.</p>
+      <p><strong>Liquidation.</strong> If a position falls to 10% of its margin or less, it closes on its own and that margin is lost. You can never lose more than your margin.</p>
+      <p><strong>Backed by the reserves.</strong> A position only opens if the reserves already cover its biggest possible win, at the edge of the band. Open positions are capped at $100 in total for now, and they show up on the <a href="/reserves">proof of reserves</a>. If leverage is full, try a smaller position later.</p>
+      <p class="warn">Leverage multiplies gains and losses. Only trade what you can afford to lose.</p>
+    </section>
+
+    <section id="chat"><h2><span>5</span>Aggregator and API: every model</h2>
       <p>Each question goes to the cheapest host for that model, and you pay only what it really cost.</p>
       <ol><li>Open the <a href="/app#chat">Aggregator</a> tab.</li><li>Pick any model.</li><li>Type your question and press Enter.</li></ol>
       <p>Under each answer: the model that wrote it, the tokens used, the price in dollars, the host it went to, and the saving against the official price. Each answer is paid from your tokens of that model if you hold some, otherwise straight from your USDG at its real cost. No balance? Deposit USDG first.</p>
@@ -104,9 +117,10 @@ curl https://www.halbrook.xyz/v1/chat/completions \
       <p>Before each request, Halbrook sets aside the most it could cost; after the answer, you pay the real cost and the rest comes back. Streaming works, and <code>GET /v1/models</code> lists the models and their prices. Add the header <code>X-Halbrook-Memory: on</code> to give the model your shared memory notes. Limits: 60 requests a minute per key, 4 at a time per account, 5 keys per account. Lost a key? Revoke it in one click.</p>
     </section>
 
-    <section id="fees"><h2><span>5</span>Fees and pricing</h2>
+    <section id="fees"><h2><span>6</span>Fees and pricing</h2>
       <table><thead><tr><th>What</th><th>Fee</th><th>Example</th></tr></thead><tbody>
         <tr><td>Swap</td><td>0.3%</td><td>$10 swapped, $0.03 fee</td></tr>
+        <tr><td>Leverage</td><td>0.3% to open, 0.3% to close, 0.01% per hour held</td><td>20 USDG position held 10 h: $0.12 + $0.02</td></tr>
         <tr><td>Aggregator and API</td><td>5% on top of the real cost</td><td>$0.0020 answer, $0.0021 paid</td></tr>
         <tr><td>Withdrawal</td><td>0.50 USDG</td><td>Withdraw 20 USDG, receive 19.50</td></tr>
         <tr><td>Deposit, sign-in</td><td>Free</td><td>You only pay the network gas on deposit, a few cents</td></tr>
@@ -114,17 +128,18 @@ curl https://www.halbrook.xyz/v1/chat/completions \
       <p>A model's price mixes its input and output prices, three parts input for one part output, like a typical conversation.</p>
     </section>
 
-    <section id="film"><h2><span>6</span>The film and the briefcase</h2>
+    <section id="film"><h2><span>7</span>The film and the briefcase</h2>
       <p>The home page is a short interactive film. The briefcase is optional: you can <a href="/app">enter the dApp</a> freely at any time, or crack KESTREL first, like a real agent.</p>
       <ol><li>Click the van to open the door.</li><li>Meet Madame Vale and Horace, her parrot. Look around and talk to them.</li><li>Find the four-digit code that opens the briefcase.</li><li>Watch the ending, then click <strong>Enter dApp</strong>. To skip the film, click <strong>Enter dApp</strong> at the top and choose <strong>Enter the dApp</strong>.</li></ol>
       <p>Stuck? Give Horace a sunflower seed and listen to what he shouts.</p>
     </section>
 
-    <section id="faq" class="faq"><h2><span>7</span>Safety and FAQ</h2>
+    <section id="faq" class="faq"><h2><span>8</span>Safety and FAQ</h2>
       <p class="warn">Halbrook will never ask for your seed phrase or private key. If anyone does, it is a scam.</p>
       <p><strong>Is it real money?</strong>Yes. Deposits and withdrawals are in USDG on Robinhood Chain. Halbrook holds the USDG you deposit and keeps your balance on its server, like an exchange: there is no Halbrook smart contract. Start small.</p>
       <p><strong>What does signing in do?</strong>It proves you own the wallet. It moves no funds and costs no gas.</p>
-      <p><strong>Do swaps happen on chain?</strong>No. Only deposits and withdrawals are blockchain transactions. Swaps and chat happen inside Halbrook: instant, with no network fee.</p>
+      <p><strong>Do swaps happen on chain?</strong>No. Only deposits and withdrawals are blockchain transactions. Swaps, leverage and chat happen inside Halbrook: instant, with no network fee.</p>
+      <p><strong>Can someone push a price to win on leverage?</strong>It does not pay. The mark price is a 4-hour average, premiums fade back toward the reference, and positions only open in a calm market. Holding a price up for hours costs more than any position could win.</p>
       <p><strong>Is every balance backed?</strong>Check it yourself on the <a href="/reserves">proof of reserves</a>: the USDG the treasury holds on chain against everything players could take out, live. If it ever fell short, withdrawals would pause on their own.</p>
       <p><strong>Something looks wrong?</strong>Write to us on X: <a href="https://x.com/halbrookmarket" target="_blank" rel="noopener">@halbrookmarket</a>. Code: <a href="https://github.com/parrotlover01/halbrook" target="_blank" rel="noopener">GitHub</a>.</p>
     </section>
