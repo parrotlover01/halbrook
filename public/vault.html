@@ -75,7 +75,8 @@ const CHAIN = 4663, HEXCHAIN = '0x1237';
 const USDG = '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168';
 const FACTORY = '0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67', SINGLETON_L2 = '0x29fcB43b46531BcA003ddC8FCB67FFE91900C762', FALLBACK = '0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99';
 const ZERO = '0x0000000000000000000000000000000000000000';
-const SEL = { setup: 'b63e800d', create: '1688f0b9', getNonce: 'd087d288', getThreshold: 'e75235b8', getOwners: 'a0e67e2b', exec: '6a761202', transfer: 'a9059cbb', balanceOf: '70a08231' };
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const SEL = { setup: 'b63e800d', create: '1688f0b9', getNonce: 'affed0e0', getThreshold: 'e75235b8', getOwners: 'a0e67e2b', exec: '6a761202', transfer: 'a9059cbb', balanceOf: '70a08231' };
 const PROXY_CREATION = '0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235';
 
 /* ---- minimal ABI encoding: address, uint, bytes, address[] ---- */
@@ -106,7 +107,7 @@ async function ensureChain() {
 }
 $('connect').onclick = async () => {
   if (!window.ethereum) return say('who', '<span class="err">No wallet found in this browser</span>');
-  try { [me] = await eth('eth_requestAccounts'); await ensureChain(); say('who', `Connected <code>${me}</code>`); } catch (e) { say('who', `<span class="err">${e.message}</span>`); }
+  try { [me] = await eth('eth_requestAccounts'); await ensureChain(); say('who', `Connected <code>${me}</code>`); } catch (e) { say('who', `<span class="err">${esc(e.message)}</span>`); }
 };
 const call = async (to, data) => eth('eth_call', [{ to, data: '0x' + data }, 'latest']);
 async function waitReceipt(hash) { for (let i = 0; i < 90; i++) { const r = await eth('eth_getTransactionReceipt', [hash]); if (r) return r; await new Promise(r => setTimeout(r, 2000)); } throw new Error('No receipt yet: check the explorer'); }
@@ -133,7 +134,7 @@ $('create').onclick = async () => {
     $('safe').value = safe;
     say('createOut', `<span class="ok">Safe created:</span> ${safe}\nNext: send it a tiny amount first, then set it as TREASURY_ADDRESS on Railway (see the guide).`);
     loadSafe();
-  } catch (e) { say('createOut', `<span class="err">${e.message || e}</span>`); }
+  } catch (e) { say('createOut', `<span class="err">${esc(e.message || e)}</span>`); }
 };
 
 /* ---- 2. load ---- */
@@ -144,7 +145,7 @@ async function loadSafe() {
     const h = o.slice(2), len = parseInt(h.slice(64, 128), 16), owners = Array.from({ length: len }, (_, i) => '0x' + h.slice(128 + i * 64 + 24, 128 + (i + 1) * 64));
     $('nonce').value = String(parseInt(n, 16));
     say('loadOut', `USDG: ${(Number(BigInt(b)) / 1e6).toFixed(2)}\nSignatures needed: ${parseInt(t, 16)} of ${len}\nNonce: ${parseInt(n, 16)}\nOwners:\n${owners.join('\n')}`);
-  } catch (e) { say('loadOut', `<span class="err">Could not read this Safe: ${e.message || e}</span>`); }
+  } catch (e) { say('loadOut', `<span class="err">Could not read this Safe: ${esc(e.message || e)}</span>`); }
 }
 $('load').onclick = () => { if (!window.ethereum) return say('loadOut', '<span class="err">Connect a wallet first</span>'); loadSafe(); };
 
@@ -173,7 +174,7 @@ $('sign').onclick = async () => {
     const line = `${me}:${sig}`;
     $('sigs').value = ($('sigs').value.trim() ? $('sigs').value.trim() + '\n' : '') + line;
     say('sendOut', `<span class="ok">Signed.</span> Send this line to the other owners:\n${line}`);
-  } catch (e) { say('sendOut', `<span class="err">${e.message || e}</span>`); }
+  } catch (e) { say('sendOut', `<span class="err">${esc(e.message || e)}</span>`); }
 };
 $('exec').onclick = async () => {
   try {
@@ -191,7 +192,7 @@ $('exec').onclick = async () => {
     const rc = await waitReceipt(hash);
     say('sendOut', rc.status === '0x1' ? `<span class="ok">Done.</span> <a href="${explorer(hash)}" target="_blank" rel="noopener">${hash}</a>` : `<span class="err">Failed on chain.</span> ${hash}`);
     loadSafe();
-  } catch (e) { say('sendOut', `<span class="err">${e.message || e}</span>`); }
+  } catch (e) { say('sendOut', `<span class="err">${esc(e.message || e)}</span>`); }
 };
 })();
 </script>

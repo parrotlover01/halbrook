@@ -56,7 +56,8 @@ async function load() {
   const w = await call('/api/admin/withdrawals');
   $('wds').innerHTML = `<b>Withdrawals in progress</b>` + (w.withdrawals && w.withdrawals.length ? `<table><tr><th>#</th><th>To</th><th>USDG</th><th>Status</th><th></th></tr>${w.withdrawals.map(x => `<tr><td>${esc(x.id)}</td><td><code>${esc(x.address.slice(0, 8))}…${esc(x.address.slice(-4))}</code></td><td>${x.usdg.toFixed(2)}</td><td>${esc(x.status)}${x.error ? `<br><span class="muted">${esc(x.error)}</span>` : ''}</td><td>${x.status === 'review' ? `<div class="row"><button data-a="approve" data-id="${esc(x.id)}">Approve</button><button class="no" data-a="reject" data-id="${esc(x.id)}">Reject</button></div>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">Nothing waiting.</p>');
   $('wds').querySelectorAll('button[data-a]').forEach(b => b.onclick = async () => {
-    if (!confirm(b.dataset.a === 'approve' ? 'Send this withdrawal?' : 'Reject and refund this withdrawal?')) return;
+    const x = (w.withdrawals || []).find(y => String(y.id) === b.dataset.id) || {};
+    if (!confirm((b.dataset.a === 'approve' ? 'Send ' : 'Reject and refund ') + (x.usdg != null ? x.usdg.toFixed(2) + ' USDG' : 'this withdrawal') + (x.address ? (b.dataset.a === 'approve' ? ' to ' : ' for ') + x.address : '') + '?')) return;
     const r = await call(`/api/admin/withdrawals/${b.dataset.id}/${b.dataset.a}`, { method: 'POST' }); if (!r.ok) alert(r.error || 'Failed'); load();
   });
 }
