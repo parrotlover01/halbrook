@@ -1119,6 +1119,7 @@ html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[dat
 .st h1 span{background:linear-gradient(90deg,#8fa2ff,#d0a6ff 60%,#ff7fb0);-webkit-background-clip:text;background-clip:text;color:transparent}
 .st .lead{color:var(--muted);max-width:560px;margin:0 0 28px}
 .st-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:10px}
+.st-who{font:400 12.5px var(--m);color:var(--muted)}.st-who b{color:#fff;font-weight:500}
 .st-note{color:var(--muted);font-size:12.5px;margin:0 0 18px}
 .st-stats div{background:var(--panel);padding:18px}
 .st-stats b{display:block;font:500 19px/1.2 var(--m);color:#fff;margin-top:8px;word-break:break-word}
@@ -2193,6 +2194,7 @@ const $ = id => document.getElementById(id), body = $('stBody');
 const E = window.ethereum; let S = null, who = null, busy = false, timer = null;
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (w, d = 18) => Number(BigInt(w || 0) / 10n ** BigInt(d - 6)) / 1e6;
+const full = w => { const s = BigInt(w).toString().padStart(19, '0'); return (s.slice(0, -18) + '.' + s.slice(-18)).replace(/\.?0+$/, ''); };   // exact, so Max really is everything
 const tok = w => num(w).toLocaleString('en-US', { maximumFractionDigits: 2 });
 const eth = v => (v >= 0.01 ? v.toFixed(4) : v.toFixed(6)) + ' ETH';
 const parse = s => { s = String(s || '').trim(); if (!/^\d*(\.\d{0,18})?$/.test(s) || s === '' || s === '.') return 0n; const [a, b = ''] = s.split('.'); return BigInt(a || 0) * 10n ** 18n + BigInt((b + '0'.repeat(18)).slice(0, 18)); };
@@ -2213,12 +2215,13 @@ function render() {
   <div class="st-stats"><div><span class="k-cap">Total staked</span><b>${tok(S.totalStaked)}</b></div><div><span class="k-cap">ETH to stakers / day</span><b>${day ? eth(day) : 'next drop soon'}</b></div><div><span class="k-cap">APR${boost ? ' · 2x now' : ''}</span><b>${S.apr ? apr(S.apr * (boost ? 2 : 1)) : '·'}</b></div><div><span class="k-cap">Your share</span><b>${me ? (share * 100).toFixed(2) + '%' : '·'}</b></div></div>
   <p class="st-note">APR is the current pace, not a promise: it moves with the total staked, the $HALBROOK price and what the platform earns.</p>
   <div class="st-card">${!who ? `<div class="st-act"><button class="pri" id="stConn">Connect wallet</button></div>` : `
+    <div class="st-who">Wallet <b>${esc(who.slice(0, 6) + '…' + who.slice(-4))}</b>${BigInt(me.wallet) === 0n && BigInt(me.staked) === 0n ? ' · no $HALBROOK in this wallet. Switch account in your wallet if your tokens are in another one.' : ''}</div>
     <div class="st-me"><div><span class="k-cap">Staked</span><b>${tok(me.staked)}</b></div><div><span class="k-cap">Earned</span><b>${eth(num(me.earnedWei))}</b>${day && share ? `<small>≈ ${eth(day * share)} / day</small>` : ''}</div><div><span class="k-cap">In your wallet</span><b>${tok(me.wallet)}</b></div></div>
     <div class="st-in"><input id="stAmt" inputmode="decimal" placeholder="Amount of $HALBROOK" autocomplete="off" value="${esc(keep)}"><button id="stMax" type="button">Max</button></div>
     <div class="st-act"><button class="pri" id="stGo">Stake</button><button id="stOut">Withdraw</button><button id="stClaim"${BigInt(me.earnedWei) > 0n ? '' : ' disabled'}>Claim ETH</button></div>`}
     <div class="st-msg" id="stMsg"></div></div>`;
   if (!who) { $('stConn').onclick = async () => { if (!E) return msg('No wallet found in this browser'); try { await E.request({ method: 'eth_requestAccounts' }); load(); } catch (e) { msg('Connection cancelled'); } }; return; }
-  $('stMax').onclick = () => { $('stAmt').value = String(num(BigInt(me.wallet) > 0n ? me.wallet : me.staked)); };
+  $('stMax').onclick = () => { const w = BigInt(me.wallet) > 0n ? me.wallet : me.staked; if (BigInt(w) === 0n) return msg('No $HALBROOK in this wallet'); $('stAmt').value = full(w); };
   $('stGo').onclick = () => act('stake'); $('stOut').onclick = () => act('withdraw'); $('stClaim').onclick = () => act('claim');
 }
 const msg = t => { const m = $('stMsg'); if (m) m.textContent = t; };
