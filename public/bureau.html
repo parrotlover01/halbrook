@@ -1112,6 +1112,34 @@ html[data-theme="light"] .us-r button.on{background:rgba(22,20,26,.07);color:#12
 html[data-theme="light"] .us-kpi{background:rgba(22,20,26,.07)}html[data-theme="light"] .us-kpi div{background:#f6f4f0}html[data-theme="light"] .us-kpi b{color:#121115}html[data-theme="light"] .us-kpi .up{color:#1d7a4c}
 html[data-theme="light"] .us-bars i.z{background:rgba(22,20,26,.1)}
 html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[data-theme="light"] .us-t td{color:#37363a;border-bottom-color:rgba(22,20,26,.06)}html[data-theme="light"] .us-t code{color:#4f4e52}
+
+/* ---------- staking ---------- */
+#stake .st{max-width:760px;margin:0 auto;padding:clamp(40px,8vh,80px) 0 80px}
+.st h1{font:500 clamp(40px,6vw,64px)/1 var(--b);letter-spacing:-.04em;margin:14px 0 14px;color:#fff}
+.st h1 span{background:linear-gradient(90deg,#8fa2ff,#d0a6ff 60%,#ff7fb0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.st .lead{color:var(--muted);max-width:560px;margin:0 0 28px}
+.st-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:18px}
+.st-stats div{background:var(--panel);padding:18px}
+.st-stats b{display:block;font:500 22px/1.2 var(--m);color:#fff;margin-top:8px;word-break:break-word}
+.st-card{border:1px solid var(--line);background:var(--panel);padding:22px;display:flex;flex-direction:column;gap:16px}
+.st-me{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.st-me b{display:block;font:500 17px/1.3 var(--m);color:#fff;margin-top:6px;word-break:break-word}
+.st-me small{color:var(--muted);font:400 12px var(--m)}
+.st-in{display:flex;border:1px solid var(--line2)}
+.st-in input{flex:1;min-width:0;background:none;border:0;color:#fff;font:500 18px var(--m);padding:14px}
+.st-in input:focus{outline:none}
+.st-in button{background:none;border:0;border-left:1px solid var(--line);color:var(--muted);font:500 12px var(--m);padding:0 16px;cursor:pointer}
+.st-act{display:flex;gap:10px;flex-wrap:wrap}
+.st-act button{flex:1;min-width:120px;font:500 14px/1 var(--b);padding:14px;border:1px solid var(--line2);background:none;color:var(--ink);cursor:pointer;border-radius:2px}
+.st-act button.pri{background:linear-gradient(90deg,#8fa2ff,#d0a6ff);color:#0b0b12;border:0}
+.st-act button:disabled{opacity:.45;cursor:default}
+.st-msg{min-height:20px;font:400 13px var(--m);color:var(--muted)}
+.st-boost{display:inline-flex;gap:10px;align-items:center;font:500 12px var(--m);letter-spacing:.12em;color:#f1e9f7;padding:9px 14px;border:1px solid rgba(255,160,190,.35);background:linear-gradient(90deg,rgba(255,106,122,.12),rgba(154,168,255,.12))}
+.st-boost b{color:#ff8d9b}
+.st-how{margin-top:26px;color:var(--muted);font-size:14px}
+.st-how li{margin:6px 0}
+.st-off{border:1px dashed var(--line2);padding:28px;text-align:center;color:var(--muted)}
+@media (max-width:640px){.st-stats,.st-me{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -1129,7 +1157,7 @@ html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[dat
 <div class="topbar"><header class="site-top">
   <a class="site-mark" href="./"><b>Halbrook</b><small>AI Token Exchange</small></a>
   <div class="site-act">
-    <nav class="site-nav"><a href="#market" data-tab="market" aria-current="page">Exchange</a><a href="#chat" data-tab="chat">Aggregator</a></nav>
+    <nav class="site-nav"><a href="#market" data-tab="market" aria-current="page">Exchange</a><a href="#chat" data-tab="chat">Aggregator</a><a href="#stake" data-tab="stake">Stake</a></nav>
     <div class="site-ico"><span class="rh-f" title="Live on Robinhood Chain" aria-label="Live on Robinhood Chain"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.84 24h.53c.096 0 .192-.048.224-.128C7.591 13.696 11.94 8.656 14.67 5.638c.112-.128.064-.225-.096-.225h-4.88a.55.55 0 0 0-.45.225L5.746 9.972c-.514.642-.642 1.236-.642 2.086v4.43c-1.14 3.194-1.862 5.361-2.392 7.32-.032.125.016.192.129.192M20.447.646c-.754-.802-4.157-.834-5.730-.224a3 3 0 0 0-.786.465 41 41 0 0 0-3.323 3.178c-.112.113-.064.225.097.225h5.409c.497 0 .786.289.786.786v6.1c0 .16.128.208.225.064l3.258-4.254c.53-.69.69-.898.835-1.861.192-1.413.08-3.58-.77-4.479m-6.982 16.18 2.231-3.676a.7.7 0 0 0 .064-.29V6.73c0-.16-.112-.225-.224-.097-3.355 3.74-5.971 7.672-8.395 12.407-.06.12.016.225.16.177l5.009-1.54c.565-.174.882-.402 1.155-.852"/></svg></span><button class="ico theme-b" id="themeBtn" type="button" aria-label="Switch light or dark mode"><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button><a class="ico" href="https://x.com/halbrookmarket" target="_blank" rel="noopener" aria-label="Halbrook on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.67l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23Zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64Z"/></svg></a><a class="ico" href="https://github.com/parrotlover01/halbrook" target="_blank" rel="noopener" aria-label="Halbrook on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg></a><a class="ico" href="/docs" aria-label="Documentation"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8.5 12h7M8.5 15.5h7M8.5 8.5h3"/></svg></a></div>
     <button class="hdr-bal" id="hdrBal" type="button" hidden title="Your balance · withdraw"><i></i><span id="hdrBalV">$0.00</span><em>Withdraw</em></button>
     <button class="hdr-dep" id="hdrDep" type="button">Deposit</button>
@@ -1237,6 +1265,17 @@ html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[dat
   </div>
 </div></section>
 
+<section id="stake" hidden><div class="wrap"><div class="st">
+  <div class="cap">Staking · $HALBROOK</div>
+  <h1>Real yield. <span>Paid in ETH.</span></h1>
+  <p class="lead">Stake $HALBROOK and earn ETH from what the platform makes: 90% of perps and spot revenue and 50% of token fees. No lockup, withdraw anytime.</p>
+  <div id="stBody"><div class="st-off">Loading…</div></div>
+  <ul class="st-how">
+    <li>ETH rewards are added every 24h and streamed over the next 24h, pro rata to your weight and time staked.</li>
+    <li>Tokens staked during the first 24h after launch count double for as long as they stay staked.</li>
+    <li>Staking runs on a public contract on Robinhood Chain: your tokens never go through Halbrook, and nobody but you can withdraw them.</li>
+  </ul>
+</div></div></section>
 <section id="ipo" hidden><div class="wrap">
   <div class="mk-top"><h1><img class="mk-bird" src="assets/bureau/mark.png" alt="">AI IPO tracker</h1><span class="ipo-asof">Checked 13 Nov 2026 · read-only</span></div>
   <div class="ipo-legend" aria-hidden="true"><span>Private</span><span>Confidential filing</span><span>Public S-1</span><span>Roadshow</span><span>Listed</span></div>
@@ -1920,8 +1959,8 @@ $('ipoRows').innerHTML = IPOS.map(x => {
 
 /* ---------- tabs: Exchange (default) / IPO ---------- */
 function showTab() {
-  const tab = ({ '#ipo': 'ipo', '#chat': 'chat', '#api': 'chat' })[location.hash] || 'market';   // the API sits in the Aggregator, under the chat
-  ['market', 'chat', 'ipo'].forEach(t => { $(t).hidden = t !== tab; }); $('api').hidden = tab !== 'chat';
+  const tab = ({ '#ipo': 'ipo', '#chat': 'chat', '#api': 'chat', '#stake': 'stake' })[location.hash] || 'market';   // the API sits in the Aggregator, under the chat
+  ['market', 'chat', 'ipo', 'stake'].forEach(t => { $(t).hidden = t !== tab; }); if (tab === 'stake' && window.hbStake) window.hbStake(); $('api').hidden = tab !== 'chat';
   if (tab === 'chat') renderApi();
   document.querySelectorAll('.site-nav a[data-tab]').forEach(a => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   if (location.hash === '#api') requestAnimationFrame(() => $('api').scrollIntoView({ behavior: 'smooth', block: 'start' })); else scrollTo(0, 0);
@@ -2147,5 +2186,68 @@ curl https://www.halbrook.xyz/v1/chat/completions \
        "messages":[{"role":"user","content":"Hello"}]}'</pre>
 </div></div>
 <div class="hiw" id="hiw" hidden role="dialog" aria-label="How it works"><div class="hiw-box"><button class="hiw-x" id="hiwX" type="button" aria-label="Close">×</button><video id="hiwVid" src="assets/bureau/exchange-works-4.mp4" poster="assets/bureau/exchange-works-4.jpg" controls playsinline preload="none"></video></div></div>
+<script>
+(() => {
+const $ = id => document.getElementById(id), body = $('stBody');
+const E = window.ethereum; let S = null, who = null, busy = false, timer = null;
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = (w, d = 18) => Number(BigInt(w || 0) / 10n ** BigInt(d - 6)) / 1e6;
+const tok = w => num(w).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const eth = v => (v >= 0.01 ? v.toFixed(4) : v.toFixed(6)) + ' ETH';
+const parse = s => { s = String(s || '').trim(); if (!/^\d*(\.\d{0,18})?$/.test(s) || s === '' || s === '.') return 0n; const [a, b = ''] = s.split('.'); return BigInt(a || 0) * 10n ** 18n + BigInt((b + '0'.repeat(18)).slice(0, 18)); };
+const word = v => BigInt(v).toString(16).padStart(64, '0');
+const left = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+async function load() {
+  try { if (E) { const a = await E.request({ method: 'eth_accounts' }); who = a && a[0] || null; } } catch (e) { who = null; }
+  try { const r = await fetch('/api/staking' + (who ? '?address=' + who : '')); S = r.ok ? await r.json() : null; } catch (e) { S = null; }
+  render();
+}
+function render() {
+  if (!S || !S.live) { body.innerHTML = '<div class="st-off">Staking opens tonight. This page goes live as soon as the contract is deployed.</div>'; return; }
+  const now = Date.now() / 1000, boost = S.boostEnd > now, me = S.me, share = me && BigInt(S.totalWeight) > 0n ? Math.min(1, Number(BigInt(me.staked) + BigInt(me.boosted)) / Number(S.totalWeight)) : 0;
+  const keep = $('stAmt') ? $('stAmt').value : '';
+  body.innerHTML = `${boost ? `<div class="st-boost" style="margin-bottom:16px"><b>2X</b> LAUNCH BOOST · ${left(S.boostEnd - now)} LEFT</div>` : ''}
+  <div class="st-stats"><div><span class="k-cap">Total staked</span><b>${tok(S.totalStaked)}</b></div><div><span class="k-cap">ETH to stakers / day</span><b>${S.ethPerDay ? eth(S.ethPerDay) : 'next drop soon'}</b></div><div><span class="k-cap">Your share</span><b>${me ? (share * 100).toFixed(2) + '%' : '·'}</b></div></div>
+  <div class="st-card">${!who ? `<div class="st-act"><button class="pri" id="stConn">Connect wallet</button></div>` : `
+    <div class="st-me"><div><span class="k-cap">Staked</span><b>${tok(me.staked)}</b>${BigInt(me.boosted) > 0n ? `<small>${tok(me.boosted)} at 2x</small>` : ''}</div><div><span class="k-cap">Earned</span><b>${eth(num(me.earnedWei))}</b>${S.ethPerDay && share ? `<small>≈ ${eth(S.ethPerDay * share)} / day</small>` : ''}</div><div><span class="k-cap">In your wallet</span><b>${tok(me.wallet)}</b></div></div>
+    <div class="st-in"><input id="stAmt" inputmode="decimal" placeholder="Amount of $HALBROOK" autocomplete="off" value="${esc(keep)}"><button id="stMax" type="button">Max</button></div>
+    <div class="st-act"><button class="pri" id="stGo">Stake</button><button id="stOut">Withdraw</button><button id="stClaim"${BigInt(me.earnedWei) > 0n ? '' : ' disabled'}>Claim ETH</button></div>`}
+    <div class="st-msg" id="stMsg"></div></div>`;
+  if (!who) { $('stConn').onclick = async () => { if (!E) return msg('No wallet found in this browser'); try { await E.request({ method: 'eth_requestAccounts' }); load(); } catch (e) { msg('Connection cancelled'); } }; return; }
+  $('stMax').onclick = () => { $('stAmt').value = String(num(BigInt(me.wallet) > 0n ? me.wallet : me.staked)); };
+  $('stGo').onclick = () => act('stake'); $('stOut').onclick = () => act('withdraw'); $('stClaim').onclick = () => act('claim');
+}
+const msg = t => { const m = $('stMsg'); if (m) m.textContent = t; };
+async function send(to, data) {
+  const h = await E.request({ method: 'eth_sendTransaction', params: [{ from: who, to, data }] });
+  for (let i = 0; i < 90; i++) { await new Promise(r => setTimeout(r, 2000)); const r = await E.request({ method: 'eth_getTransactionReceipt', params: [h] }); if (r) { if (r.status !== '0x1') throw new Error('reverted'); return; } }
+}
+async function act(kind) {
+  if (busy || !S || !S.live) return; busy = true;
+  try {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(S.address) || S.chainId !== 4663 || String(S.token).toLowerCase() !== '0x3ed7e776d6b6a87d486a369c24b340dc7266e31d') return msg('Staking is unavailable right now');
+    try { await E.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x1237' }] }); } catch (e) { }
+    if (parseInt(await E.request({ method: 'eth_chainId' }), 16) !== 4663) return msg('Switch your wallet to Robinhood Chain and try again');
+    const [a] = await E.request({ method: 'eth_accounts' }); if (!a || a.toLowerCase() !== who.toLowerCase()) { await load(); return msg('Wallet changed, try again'); }
+    const amt = parse($('stAmt') && $('stAmt').value), me = S.me;
+    if (kind === 'stake') {
+      if (amt <= 0n) return msg('Enter an amount'); if (amt > BigInt(me.wallet)) return msg('Not enough $HALBROOK in this wallet');
+      if (BigInt(me.allowance) < amt) { msg('1/2 · Approve in your wallet…'); await send(S.token, '0x095ea7b3' + word(S.address) + word(amt)); }
+      msg((BigInt(me.allowance) < amt ? '2/2 · ' : '') + 'Confirm the stake in your wallet…'); await send(S.address, '0xa694fc3a' + word(amt)); msg('Staked');
+    } else if (kind === 'withdraw') {
+      if (amt <= 0n) return msg('Enter an amount'); if (amt > BigInt(me.staked)) return msg('You have less than that staked');
+      msg('Confirm in your wallet…'); await send(S.address, '0x2e1a7d4d' + word(amt)); msg('Withdrawn');
+    } else { msg('Confirm in your wallet…'); await send(S.address, '0x4e71d92d'); msg('ETH claimed'); }
+    if ($('stAmt')) $('stAmt').value = ''; setTimeout(load, 1500);
+  } catch (e) {
+    const t = String((e && (e.data && e.data.message || e.message)) || '').toLowerCase();
+    msg(e && e.code === 4001 ? 'Cancelled' : /insufficient funds|gas/.test(t) ? 'Not enough ETH on Robinhood Chain for the network fee' : 'Transaction failed, nothing was moved');
+  } finally { busy = false; }
+}
+window.hbStake = () => { load(); clearInterval(timer); timer = setInterval(() => { if (!$('stake').hidden && !busy) load(); }, 20000); };
+if (E && E.on) E.on('accountsChanged', () => { if (!$('stake').hidden) load(); });
+if (location.hash === '#stake') window.hbStake();
+})();
+</script>
 </body>
 </html>

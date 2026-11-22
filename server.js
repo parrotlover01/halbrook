@@ -566,12 +566,44 @@ function posView(x, k) {
     exit: x.exit != null ? Number(x.exit) * 1e6 : null, payout: x.payout != null ? Number(x.payout) / 1e6 : null };
 }
 
+/* ---------- $HALBROOK staking (on-chain contract, read only here) ---------- */
+const HALBROOK_TOKEN = '0x3ed7e776d6b6a87d486a369c24b340dc7266e31d';
+const STAKING = /^0x[0-9a-fA-F]{40}$/.test(process.env.STAKING_ADDRESS || '') ? process.env.STAKING_ADDRESS.toLowerCase() : null;
+const word = a => a.toLowerCase().slice(2).padStart(64, '0');
+const call = async (to, data) => BigInt((await rpc('eth_call', [{ to, data }, 'latest'])) || '0x0');
+let stakingOk = null, stakingHit = null;
+async function stakingView(user) {
+  if (!STAKING) return { live: false };
+  if (stakingOk === null) stakingOk = (await call(STAKING, '0xfc0c546a')) === BigInt(HALBROOK_TOKEN);   // token() must be $HALBROOK
+  if (!stakingOk) return { live: false };
+  if (!stakingHit || Date.now() - stakingHit.at > 15_000) {
+    const [ts, tw, rate, fin, boost] = await Promise.all(['0x817b1cd2', '0x96c82e57', '0x7b0a47ee', '0xebe2b12b', '0xf20f3487'].map(s => call(STAKING, s)));
+    const now = BigInt(Math.floor(Date.now() / 1000)), live = fin > now;
+    stakingHit = { at: Date.now(), v: { live: true, address: STAKING, token: HALBROOK_TOKEN, chainId: CHAIN.id, totalStaked: ts.toString(), totalWeight: tw.toString(),
+      ethPerDay: live ? Number(rate * 86400n / 10n ** 18n) / 1e18 : 0, periodFinish: Number(fin), boostEnd: Number(boost) } };
+  }
+  const v = { ...stakingHit.v };
+  if (user) {
+    const [st, bo, ea, bal, alw] = await Promise.all([call(STAKING, '0x98807d84' + word(user)), call(STAKING, '0x83e0c6b2' + word(user)), call(STAKING, '0x008cc262' + word(user)),
+      call(HALBROOK_TOKEN, '0x70a08231' + word(user)), call(HALBROOK_TOKEN, '0xdd62ed3e' + word(user) + word(STAKING))]);
+    v.me = { staked: st.toString(), boosted: bo.toString(), earnedWei: ea.toString(), wallet: bal.toString(), allowance: alw.toString() };
+  }
+  return v;
+}
+
 /* ---------- API ---------- */
 async function api(req, res, p) {
   if (!db) return send(res, 503, { error: 'Database not configured' });
   try {
     if (p === '/api/config' && req.method === 'GET')
       return send(res, 200, { funds: { live: LIVE && liveReady, address: LIVE ? TREASURY : null, chainId: CHAIN.id, chainName: CHAIN.name, rpc: 'https://rpc.mainnet.chain.robinhood.com', explorer: CHAIN.explorer, usdg: USDG_CONTRACT, confirmations: CONFIRMATIONS, withdrawals: WD_ON, wdMax: WD_MAX, wdDaily: WD_DAILY, wdAuto: WD_AUTO, wdFee: WD_FEE }, testMode: TEST_MODE, chat: !!OR_KEY, margin: MARGIN, swapFee: SWAP_FEE, leverage: LEV_ON, models: MODELS.filter(m => PRICES[m]).map(m => ({ id: m, name: PRICES[m].name, blendPerM: PRICES[m].blend * 1e6 })) });
+
+    if (p === '/api/staking' && req.method === 'GET') {
+      if (overLimit('staking:' + ipOf(req), 60, 60_000)) return send(res, 429, { error: 'Slow down a little' });
+      const who = new URL(req.url, 'http://x').searchParams.get('address');
+      if (who && !/^0x[0-9a-fA-F]{40}$/.test(who)) return send(res, 400, { error: 'Bad address' });
+      try { return send(res, 200, await stakingView(who)); } catch (e) { return send(res, 503, { error: 'Staking data is unavailable right now' }); }
+    }
 
     if (p === '/api/market' && req.method === 'GET')
       return send(res, 200, { band: BAND, depthUsd: DEPTH_USD, halfLifeH: HALF_LIFE_H, swapFee: SWAP_FEE, models: marketView(await premiums()) });
@@ -1068,8 +1100,8 @@ const SEC = { 'Content-Security-Policy': CSP, 'X-Content-Type-Options': 'nosniff
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()', 'Cross-Origin-Opener-Policy': 'same-origin-allow-popups' };
 const GZIP = /^(text\/|image\/svg)/;
 const ROOT_DIR = ROOT + path.sep;
-const CLEAN_URLS = { '/app': '/bureau.html', '/docs': '/docs.html', '/reserves': '/reserves.html', '/admin': '/admin.html', '/vault': '/vault.html' };
-const OLD_URLS = { '/bureau.html': '/app', '/docs.html': '/docs', '/reserves.html': '/reserves', '/admin.html': '/admin', '/vault.html': '/vault', '/index.html': '/' };
+const CLEAN_URLS = { '/app': '/bureau.html', '/docs': '/docs.html', '/reserves': '/reserves.html', '/admin': '/admin.html', '/vault': '/vault.html', '/stake-admin': '/stake-admin.html' };
+const OLD_URLS = { '/bureau.html': '/app', '/docs.html': '/docs', '/reserves.html': '/reserves', '/admin.html': '/admin', '/vault.html': '/vault', '/stake-admin.html': '/stake-admin', '/index.html': '/' };
 function serve(req, res, p) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
   // clean addresses: /app, /docs, /reserves, /admin. The old .html ones redirect for good, so shared links keep working.

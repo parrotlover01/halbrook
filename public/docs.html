@@ -56,7 +56,7 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
 </header>
 <div class="wrap">
   <aside class="toc" aria-label="Chapters"><b>Chapters</b>
-    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#leverage">4. Leverage</a><a href="#chat">5. Aggregator and API</a><a href="#fees">6. Fees</a><a href="#film">7. The film</a><a href="#faq">8. Safety and FAQ</a>
+    <a href="#what">1. What is Halbrook</a><a href="#start">2. Getting started</a><a href="#swap">3. Swap</a><a href="#leverage">4. Leverage</a><a href="#staking">5. Staking</a><a href="#chat">6. Aggregator and API</a><a href="#fees">7. Fees</a><a href="#film">8. The film</a><a href="#faq">9. Safety and FAQ</a>
   </aside>
   <main>
     <h1>Halbrook Docs</h1>
@@ -100,7 +100,16 @@ code{font:500 14px ui-monospace,Menlo,monospace;color:#fff}
       <p class="warn">Leverage multiplies gains and losses. Only trade what you can afford to lose.</p>
     </section>
 
-    <section id="chat"><h2><span>5</span>Aggregator and API: every model</h2>
+    <section id="staking"><h2><span>5</span>Staking: real yield in ETH</h2>
+      <p>Stake <strong>$HALBROOK</strong> and earn ETH from what the platform makes: 90% of perps and spot revenue and 50% of token fees. There are no emissions: every reward is ETH the platform actually earned.</p>
+      <ol><li>Open the <a href="/app#stake">Stake</a> tab and connect your wallet on Robinhood Chain.</li><li>Enter an amount and click <strong>Stake</strong>. The first time, your wallet asks you to approve $HALBROOK, then to confirm the stake.</li><li>Your ETH grows every second. Click <strong>Claim ETH</strong> whenever you want, and <strong>Withdraw</strong> to take your tokens back. There is no lockup.</li></ol>
+      <div class="steps"><div><i>24h</i><b>Reward drops</b><small>ETH added every day</small></div><div><i>0</i><b>Lockup</b><small>withdraw anytime</small></div><div><i>2x</i><b>Launch boost</b><small>first 24h stakers</small></div><div><i>ETH</i><b>Paid in</b><small>claim anytime</small></div></div>
+      <p><strong>How rewards are shared.</strong> Every 24h, ETH is added to the staking contract and streamed over the next 24 hours. Each second, it is shared pro rata to each staker's weight. Staking just before a drop and leaving right after earns almost nothing: rewards follow time staked.</p>
+      <p><strong>Launch boost.</strong> Tokens staked during the first 24 hours after launch count double for as long as they stay staked. If you withdraw part of your stake, the tokens without boost leave first.</p>
+      <p><strong>Your tokens stay yours.</strong> Staking runs on a public contract on Robinhood Chain. Your $HALBROOK never goes through Halbrook, and nobody but you can withdraw it. The contract owner can only add ETH rewards: it can never move staked tokens or earned ETH. The source is on <a href="https://github.com/parrotlover01/halbrook/tree/main/contracts" target="_blank" rel="noopener">GitHub</a>.</p>
+    </section>
+
+    <section id="chat"><h2><span>6</span>Aggregator and API: every model</h2>
       <p>Each question goes to the cheapest host for that model, and you pay only what it really cost.</p>
       <ol><li>Open the <a href="/app#chat">Aggregator</a> tab.</li><li>Pick any model.</li><li>Type your question and press Enter.</li></ol>
       <p>Under each answer: the model that wrote it, the tokens used, the price in dollars, the host it went to, and the saving against the official price. Each answer is paid from your tokens of that model if you hold some, otherwise straight from your USDG at its real cost. No balance? Deposit USDG first.</p>
@@ -117,7 +126,7 @@ curl https://www.halbrook.xyz/v1/chat/completions \
       <p>Before each request, Halbrook sets aside the most it could cost; after the answer, you pay the real cost and the rest comes back. Streaming works, and <code>GET /v1/models</code> lists the models and their prices. Add the header <code>X-Halbrook-Memory: on</code> to give the model your shared memory notes. Limits: 60 requests a minute per key, 4 at a time per account, 5 keys per account. Lost a key? Revoke it in one click.</p>
     </section>
 
-    <section id="fees"><h2><span>6</span>Fees and pricing</h2>
+    <section id="fees"><h2><span>7</span>Fees and pricing</h2>
       <table><thead><tr><th>What</th><th>Fee</th><th>Example</th></tr></thead><tbody>
         <tr><td>Swap</td><td>0.3%</td><td>$10 swapped, $0.03 fee</td></tr>
         <tr><td>Leverage</td><td>0.3% to open, 0.3% to close, 0.01% per hour held</td><td>20 USDG position held 10 h: $0.12 + $0.02</td></tr>
@@ -128,13 +137,13 @@ curl https://www.halbrook.xyz/v1/chat/completions \
       <p>A model's price mixes its input and output prices, three parts input for one part output, like a typical conversation.</p>
     </section>
 
-    <section id="film"><h2><span>7</span>The film and the briefcase</h2>
+    <section id="film"><h2><span>8</span>The film and the briefcase</h2>
       <p>The home page is a short interactive film. The briefcase is optional: you can <a href="/app">enter the dApp</a> freely at any time, or crack KESTREL first, like a real agent.</p>
       <ol><li>Click the van to open the door.</li><li>Meet Madame Vale and Horace, her parrot. Look around and talk to them.</li><li>Find the four-digit code that opens the briefcase.</li><li>Watch the ending, then click <strong>Enter dApp</strong>. To skip the film, click <strong>Enter dApp</strong> at the top and choose <strong>Enter the dApp</strong>.</li></ol>
       <p>Stuck? Give Horace a sunflower seed and listen to what he shouts.</p>
     </section>
 
-    <section id="faq" class="faq"><h2><span>8</span>Safety and FAQ</h2>
+    <section id="faq" class="faq"><h2><span>9</span>Safety and FAQ</h2>
       <p class="warn">Halbrook will never ask for your seed phrase or private key. If anyone does, it is a scam.</p>
       <p><strong>Is it real money?</strong>Yes. Deposits and withdrawals are in USDG on Robinhood Chain. Halbrook holds the USDG you deposit and keeps your balance on its server, like an exchange: there is no Halbrook smart contract. Start small.</p>
       <p><strong>What does signing in do?</strong>It proves you own the wallet. It moves no funds and costs no gas.</p>
