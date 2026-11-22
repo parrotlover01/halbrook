@@ -10,3 +10,8 @@ remappings = ["forge-std/=lib/forge-std/src/"]
 
 [fuzz]
 runs = 512
+
+[invariant]
+runs = 300
+depth = 80
+fail_on_revert = true

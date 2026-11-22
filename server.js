@@ -570,8 +570,8 @@ function posView(x, k) {
 const HALBROOK_TOKEN = '0x3ed7e776d6b6a87d486a369c24b340dc7266e31d';
 const STAKING = /^0x[0-9a-fA-F]{40}$/.test(process.env.STAKING_ADDRESS || '') ? process.env.STAKING_ADDRESS.toLowerCase() : null;
 const word = a => a.toLowerCase().slice(2).padStart(64, '0');
-const call = async (to, data) => BigInt((await rpc('eth_call', [{ to, data }, 'latest'])) || '0x0');
-let stakingOk = null, stakingHit = null;
+const call = async (to, data) => { const r = await rpc('eth_call', [{ to, data }, 'latest']); return r && r.length > 2 ? BigInt(r) : 0n; };
+let stakingOk = null, stakingHit = null; const stakingMe = new Map();
 async function stakingView(user) {
   if (!STAKING) return { live: false };
   if (stakingOk === null) stakingOk = (await call(STAKING, '0xfc0c546a')) === BigInt(HALBROOK_TOKEN);   // token() must be $HALBROOK
@@ -584,9 +584,12 @@ async function stakingView(user) {
   }
   const v = { ...stakingHit.v };
   if (user) {
+    const k = user.toLowerCase(), c = stakingMe.get(k);   // one chain read per wallet every few seconds at most
+    if (c && Date.now() - c.at < 3000) { v.me = c.me; return v; }
     const [st, bo, ea, bal, alw] = await Promise.all([call(STAKING, '0x98807d84' + word(user)), call(STAKING, '0x83e0c6b2' + word(user)), call(STAKING, '0x008cc262' + word(user)),
       call(HALBROOK_TOKEN, '0x70a08231' + word(user)), call(HALBROOK_TOKEN, '0xdd62ed3e' + word(user) + word(STAKING))]);
     v.me = { staked: st.toString(), boosted: bo.toString(), earnedWei: ea.toString(), wallet: bal.toString(), allowance: alw.toString() };
+    if (stakingMe.size > 5000) stakingMe.clear(); stakingMe.set(k, { at: Date.now(), me: v.me });
   }
   return v;
 }
