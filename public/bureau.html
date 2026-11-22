@@ -1271,8 +1271,8 @@ html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[dat
   <p class="lead">Stake $HALBROOK and earn ETH from what the platform makes: 90% of perps and spot revenue and 50% of token fees. No lockup, withdraw anytime.</p>
   <div id="stBody"><div class="st-off">Loading…</div></div>
   <ul class="st-how">
-    <li>ETH rewards are added every 24h and streamed over the next 24h, pro rata to your weight and time staked.</li>
-    <li>Tokens staked during the first 24h after launch count double for as long as they stay staked.</li>
+    <li>ETH rewards are streamed every second, pro rata to your stake and time staked. New revenue is added to the pool every 24h.</li>
+    <li>Launch boost: during the first 24h, rewards are streamed twice as fast.</li>
     <li>Staking runs on a public contract on Robinhood Chain: your tokens never go through Halbrook, and nobody but you can withdraw them.</li>
   </ul>
 </div></div></section>
@@ -2205,12 +2205,12 @@ async function load() {
 function render() {
   if (!S || !S.live) { body.innerHTML = '<div class="st-off">Staking opens tonight. This page goes live as soon as the contract is deployed.</div>'; return; }
   if (who && !S.me) who = null;
-  const now = Date.now() / 1000, boost = S.boostEnd > now, me = S.me, share = me && BigInt(S.totalWeight) > 0n ? Math.min(1, Number(BigInt(me.staked) + BigInt(me.boosted)) / Number(S.totalWeight)) : 0;
+  const now = Date.now() / 1000, boost = S.boostEnd > now, me = S.me, share = me && BigInt(S.totalStaked) > 0n ? Math.min(1, Number(BigInt(me.staked)) / Number(S.totalStaked)) : 0, day = S.ethPerDay * (boost ? 2 : 1), ends = S.periodFinish - now;
   const keep = $('stAmt') ? $('stAmt').value : '';
-  body.innerHTML = `${boost ? `<div class="st-boost" style="margin-bottom:16px"><b>2X</b> LAUNCH BOOST · ${left(S.boostEnd - now)} LEFT</div>` : ''}
-  <div class="st-stats"><div><span class="k-cap">Total staked</span><b>${tok(S.totalStaked)}</b></div><div><span class="k-cap">ETH to stakers / day</span><b>${S.ethPerDay ? eth(S.ethPerDay) : 'next drop soon'}</b></div><div><span class="k-cap">Your share</span><b>${me ? (share * 100).toFixed(2) + '%' : '·'}</b></div></div>
+  body.innerHTML = `${boost ? `<div class="st-boost" style="margin-bottom:16px"><b>2X</b> REWARDS · LAUNCH BOOST · ${left(S.boostEnd - now)} LEFT</div>` : ''}
+  <div class="st-stats"><div><span class="k-cap">Total staked</span><b>${tok(S.totalStaked)}</b></div><div><span class="k-cap">ETH to stakers / day</span><b>${day ? eth(day) : 'next drop soon'}</b></div><div><span class="k-cap">Your share</span><b>${me ? (share * 100).toFixed(2) + '%' : '·'}</b></div></div>
   <div class="st-card">${!who ? `<div class="st-act"><button class="pri" id="stConn">Connect wallet</button></div>` : `
-    <div class="st-me"><div><span class="k-cap">Staked</span><b>${tok(me.staked)}</b>${BigInt(me.boosted) > 0n ? `<small>${tok(me.boosted)} at 2x</small>` : ''}</div><div><span class="k-cap">Earned</span><b>${eth(num(me.earnedWei))}</b>${S.ethPerDay && share ? `<small>≈ ${eth(S.ethPerDay * share)} / day</small>` : ''}</div><div><span class="k-cap">In your wallet</span><b>${tok(me.wallet)}</b></div></div>
+    <div class="st-me"><div><span class="k-cap">Staked</span><b>${tok(me.staked)}</b></div><div><span class="k-cap">Earned</span><b>${eth(num(me.earnedWei))}</b>${day && share ? `<small>≈ ${eth(day * share)} / day</small>` : ''}</div><div><span class="k-cap">In your wallet</span><b>${tok(me.wallet)}</b></div></div>
     <div class="st-in"><input id="stAmt" inputmode="decimal" placeholder="Amount of $HALBROOK" autocomplete="off" value="${esc(keep)}"><button id="stMax" type="button">Max</button></div>
     <div class="st-act"><button class="pri" id="stGo">Stake</button><button id="stOut">Withdraw</button><button id="stClaim"${BigInt(me.earnedWei) > 0n ? '' : ' disabled'}>Claim ETH</button></div>`}
     <div class="st-msg" id="stMsg"></div></div>`;
@@ -2219,8 +2219,10 @@ function render() {
   $('stGo').onclick = () => act('stake'); $('stOut').onclick = () => act('withdraw'); $('stClaim').onclick = () => act('claim');
 }
 const msg = t => { const m = $('stMsg'); if (m) m.textContent = t; };
+// gas: what the call needs moves a little between the estimate and the block it lands in (one more reward update to write), so always leave room; unused gas is refunded
+const roomy = async tx => { try { const g = BigInt(await E.request({ method: 'eth_estimateGas', params: [tx] })); return { ...tx, gas: '0x' + (g * 3n / 2n + 40000n).toString(16) }; } catch (e) { return tx; } };
 async function send(to, data) {
-  const h = await E.request({ method: 'eth_sendTransaction', params: [{ from: who, to, data }] });
+  const h = await E.request({ method: 'eth_sendTransaction', params: [await roomy({ from: who, to, data })] });
   for (let i = 0; i < 90; i++) { await new Promise(r => setTimeout(r, 2000)); const r = await E.request({ method: 'eth_getTransactionReceipt', params: [h] }); if (r) { if (r.status !== '0x1') throw new Error('reverted'); return; } }
 }
 async function act(kind) {

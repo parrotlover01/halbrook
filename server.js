@@ -577,18 +577,18 @@ async function stakingView(user) {
   if (stakingOk === null) stakingOk = (await call(STAKING, '0xfc0c546a')) === BigInt(HALBROOK_TOKEN);   // token() must be $HALBROOK
   if (!stakingOk) return { live: false };
   if (!stakingHit || Date.now() - stakingHit.at > 15_000) {
-    const [ts, tw, rate, fin, boost] = await Promise.all(['0x817b1cd2', '0x96c82e57', '0x7b0a47ee', '0xebe2b12b', '0xf20f3487'].map(s => call(STAKING, s)));
+    const [ts, rate, fin, boost] = await Promise.all(['0x817b1cd2', '0x7b0a47ee', '0xebe2b12b', '0xf20f3487'].map(s => call(STAKING, s)));
     const now = BigInt(Math.floor(Date.now() / 1000)), live = fin > now;
-    stakingHit = { at: Date.now(), v: { live: true, address: STAKING, token: HALBROOK_TOKEN, chainId: CHAIN.id, totalStaked: ts.toString(), totalWeight: tw.toString(),
-      ethPerDay: live ? Number(rate * 86400n / 10n ** 18n) / 1e18 : 0, periodFinish: Number(fin), boostEnd: Number(boost) } };
+    stakingHit = { at: Date.now(), v: { live: true, address: STAKING, token: HALBROOK_TOKEN, chainId: CHAIN.id, totalStaked: ts.toString(),
+      ethPerDay: live ? Number(rate * 86400n / 10n ** 18n) / 1e18 : 0, periodFinish: Number(fin), boostEnd: Number(boost) } };   // ethPerDay is the pace outside the boost; during it, twice that
   }
   const v = { ...stakingHit.v };
   if (user) {
     const k = user.toLowerCase(), c = stakingMe.get(k);   // one chain read per wallet every few seconds at most
     if (c && Date.now() - c.at < 3000) { v.me = c.me; return v; }
-    const [st, bo, ea, bal, alw] = await Promise.all([call(STAKING, '0x98807d84' + word(user)), call(STAKING, '0x83e0c6b2' + word(user)), call(STAKING, '0x008cc262' + word(user)),
+    const [st, ea, bal, alw] = await Promise.all([call(STAKING, '0x98807d84' + word(user)), call(STAKING, '0x008cc262' + word(user)),
       call(HALBROOK_TOKEN, '0x70a08231' + word(user)), call(HALBROOK_TOKEN, '0xdd62ed3e' + word(user) + word(STAKING))]);
-    v.me = { staked: st.toString(), boosted: bo.toString(), earnedWei: ea.toString(), wallet: bal.toString(), allowance: alw.toString() };
+    v.me = { staked: st.toString(), earnedWei: ea.toString(), wallet: bal.toString(), allowance: alw.toString() };
     if (stakingMe.size > 5000) stakingMe.clear(); stakingMe.set(k, { at: Date.now(), me: v.me });
   }
   return v;
