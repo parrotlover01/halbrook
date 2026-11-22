@@ -572,15 +572,30 @@ const STAKING = /^0x[0-9a-fA-F]{40}$/.test(process.env.STAKING_ADDRESS || '') ? 
 const word = a => a.toLowerCase().slice(2).padStart(64, '0');
 const call = async (to, data) => { const r = await rpc('eth_call', [{ to, data }, 'latest']); return r && r.length > 2 ? BigInt(r) : 0n; };
 let stakingOk = null, stakingHit = null; const stakingMe = new Map();
+// $HALBROOK price in ETH, from its deepest ETH pool (public DEX data), to turn the reward pace into an APR
+let hbPrice = { at: 0, eth: null };
+async function halbrookEth() {
+  if (Date.now() - hbPrice.at < 300_000) return hbPrice.eth;
+  hbPrice.at = Date.now();
+  try {
+    const r = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + HALBROOK_TOKEN, { signal: AbortSignal.timeout(8000) }), j = await r.json();
+    const best = (j.pairs || []).filter(p => p.chainId === 'robinhood' && p.baseToken && p.baseToken.address.toLowerCase() === HALBROOK_TOKEN && p.quoteToken && /^(ETH|WETH)$/.test(p.quoteToken.symbol) && p.liquidity && p.liquidity.usd >= 1000)
+      .sort((a, b) => b.liquidity.usd - a.liquidity.usd)[0];
+    const v = best ? Number(best.priceNative) : NaN;
+    if (v > 0 && Number.isFinite(v)) hbPrice.eth = v;
+  } catch (e) {}
+  return hbPrice.eth;
+}
 async function stakingView(user) {
   if (!STAKING) return { live: false };
   if (stakingOk === null) stakingOk = (await call(STAKING, '0xfc0c546a')) === BigInt(HALBROOK_TOKEN);   // token() must be $HALBROOK
   if (!stakingOk) return { live: false };
   if (!stakingHit || Date.now() - stakingHit.at > 15_000) {
     const [ts, rate, fin, boost] = await Promise.all(['0x817b1cd2', '0x7b0a47ee', '0xebe2b12b', '0xf20f3487'].map(s => call(STAKING, s)));
-    const now = BigInt(Math.floor(Date.now() / 1000)), live = fin > now;
+    const now = BigInt(Math.floor(Date.now() / 1000)), live = fin > now, px = await halbrookEth();
+    const perDay = live ? Number(rate * 86400n / 10n ** 18n) / 1e18 : 0, tvlEth = px ? Number(ts / 10n ** 12n) / 1e6 * px : 0;
     stakingHit = { at: Date.now(), v: { live: true, address: STAKING, token: HALBROOK_TOKEN, chainId: CHAIN.id, totalStaked: ts.toString(),
-      ethPerDay: live ? Number(rate * 86400n / 10n ** 18n) / 1e18 : 0, periodFinish: Number(fin), boostEnd: Number(boost) } };   // ethPerDay is the pace outside the boost; during it, twice that
+      ethPerDay: perDay, apr: tvlEth > 0 && perDay > 0 ? perDay * 365 / tvlEth : null, periodFinish: Number(fin), boostEnd: Number(boost) } };   // ethPerDay is the pace outside the boost; during it, twice that
   }
   const v = { ...stakingHit.v };
   if (user) {
