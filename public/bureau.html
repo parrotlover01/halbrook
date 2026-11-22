@@ -1994,7 +1994,7 @@ async function openFunds(tab) {
     <div class="fd-avail"><span>Available</span><b>$${usdgBal().toFixed(2)}</b></div>
     ${wdOpen && !usdgBal() ? `<p class="fd-empty">Nothing to withdraw yet. Withdrawals are paid in USDG: on the Exchange, swap your tokens with "You get: USDG", then come back here.</p>` : ''}
     ${wdOpen && usdgBal() ? `<div class="fd-send"><div class="fd-in"><input id="fdWdAmt" type="number" min="1" step="1" placeholder="Amount in USDG" inputmode="decimal"><button type="button" class="tx-max" id="fdWdMax">Max</button></div><button class="sw-go" type="button" id="fdWdGo">Withdraw</button></div>
-    <p class="fd-warn">Fee ${(F.wdFee || 0).toFixed(2)} USDG per withdrawal. Up to ${F.wdMax} USDG per withdrawal and ${F.wdDaily} per day. Above ${F.wdAuto} USDG, a person checks it first.</p>` : ''}`;
+    <p class="fd-warn">Fee ${(F.wdFee || 0).toFixed(2)} USDG per withdrawal. ${F.wdMax < F.wdDaily ? `Up to ${F.wdMax} USDG per withdrawal and ${F.wdDaily} per day.` : `Up to ${F.wdDaily} USDG per day.`}${F.wdAuto < F.wdMax ? ` Above ${F.wdAuto} USDG, a person checks it first.` : ''}</p>` : ''}`;
   if ($('fdCopy')) $('fdCopy').onclick = () => navigator.clipboard && navigator.clipboard.writeText(F.address).then(() => { $('fdCopy').textContent = 'Copied'; });
   if ($('fdSend')) $('fdSend').onclick = sendDeposit;
   if ($('fdWdGo')) $('fdWdGo').onclick = doWithdraw;
