@@ -580,8 +580,9 @@ async function api(req, res, p) {
       if (overLimit('quote:' + ipOf(req), 240, 60_000)) return send(res, 429, { error: 'Slow down a little' });
       const u = new URL(req.url, 'http://x'), amt = Math.floor(Number(u.searchParams.get('tokens')));
       if (!Number.isSafeInteger(amt) || amt <= 0 || amt > 1e12) return send(res, 400, { error: 'Bad amount' });
+      const from = u.searchParams.get('from'), to = u.searchParams.get('to');
       if (PAUSED.has(from) || PAUSED.has(to)) return send(res, 503, { error: 'Trading on this model is paused while its new price is checked. Back soon.' });
-      const q = quote(u.searchParams.get('from'), u.searchParams.get('to'), amt, await premiums());
+      const q = quote(from, to, amt, await premiums());
       return q ? send(res, 200, q) : send(res, 400, { error: 'Pick two different models' });
     }
 
