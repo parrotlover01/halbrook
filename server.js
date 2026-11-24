@@ -12,7 +12,7 @@ const SWAP_FEE = 0.003;
 const SECRET = (process.env.SESSION_SECRET || '').length >= 32 ? process.env.SESSION_SECRET : '';   // shorter than 32 characters: no sessions at all
 if (!SECRET) console.error('SESSION_SECRET is missing or shorter than 32 characters: sign-in is off');
 const OR_KEY = process.env.OPENROUTER_API_KEY || '';
-const MODELS = ['anthropic/claude-opus-5.5', 'anthropic/claude-fable-5.2', 'openai/gpt-6-astra', 'openai/gpt-6.1-sol', 'openai/gpt-6.1-terra', 'google/gemini-4-neon', 'google/gemini-4-carbon', 'mistralai/mistral-large-4-0', 'deepseek/deepseek-v4.1-flash-1017', 'deepseek/deepseek-v4-pro', 'x-ai/grok-4.7'];
+const MODELS = ['anthropic/claude-opus-5.5', 'anthropic/claude-fable-5.2', 'openai/gpt-6-astra', 'openai/gpt-6.2-astra', 'openai/gpt-6.1-sol', 'openai/gpt-6.1-terra', 'google/gemini-4-neon', 'google/gemini-4-carbon', 'mistralai/mistral-large-4-0', 'deepseek/deepseek-v4.1-flash-1017', 'deepseek/deepseek-v4-pro', 'x-ai/grok-4.7'];
 const FAUCET = { model: 'mistralai/mistral-large-4-0', tokens: 2_000_000 }; // test credit, once per wallet
 const FAUCET_PER_IP = Number(process.env.FAUCET_PER_IP || 3);            // test credits per IP per day
 const CHAT_DAILY_USD = Number(process.env.CHAT_DAILY_USD || 100);        // breaker on what chat + API may spend per day, all users (every request is prepaid)
