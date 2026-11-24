@@ -1119,7 +1119,7 @@ html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[dat
 .st h1{font:500 clamp(40px,6vw,64px)/1 var(--b);letter-spacing:-.04em;margin:14px 0 14px;color:var(--ink)}
 .st h1 span{background:linear-gradient(90deg,#8fa2ff,#d0a6ff 60%,#ff7fb0);-webkit-background-clip:text;background-clip:text;color:transparent}
 .st .lead{color:var(--muted);max-width:560px;margin:0 0 28px}
-.st-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:10px}
+.st-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:10px}
 .st-who{font:400 12.5px var(--m);color:var(--muted)}.st-who b{color:var(--ink);font-weight:500}
 .st-note{color:var(--muted);font-size:12.5px;margin:0 0 18px}
 .st-stats div{background:var(--panel);padding:18px}
@@ -1142,7 +1142,7 @@ html[data-theme="light"] .us-t th{border-bottom-color:rgba(22,20,26,.1)}html[dat
 .st-how{margin-top:26px;color:var(--muted);font-size:14px}
 .st-how li{margin:6px 0}
 .st-off{border:1px dashed var(--line2);padding:28px;text-align:center;color:var(--muted)}
-@media (max-width:640px){.st-stats,.st-me{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){.st-stats,.st-me{grid-template-columns:1fr 1fr}.st-stats div:first-child{grid-column:1/-1}}
 html[data-theme="light"] .st-boost b{color:#d6334c}html[data-theme="light"] .st h1 span{background:linear-gradient(90deg,#5b6ee8,#a05ee0 60%,#e0457f);-webkit-background-clip:text;background-clip:text}
 </style>
 </head>
@@ -2215,7 +2215,7 @@ function render() {
   const now = Date.now() / 1000, boost = S.boostEnd > now, me = S.me, share = me && BigInt(S.totalStaked) > 0n ? Math.min(1, Number(BigInt(me.staked)) / Number(S.totalStaked)) : 0, day = S.ethPerDay * (boost ? 2 : 1), ends = S.periodFinish - now;
   const keep = $('stAmt') ? $('stAmt').value : '';
   body.innerHTML = `${boost ? `<div class="st-boost" style="margin-bottom:16px"><b>2X</b> REWARDS · LAUNCH BOOST · ${left(S.boostEnd - now)} LEFT</div>` : ''}
-  <div class="st-stats"><div><span class="k-cap">Total staked</span><b>${tok(S.totalStaked)}</b></div><div><span class="k-cap">ETH to stakers / day</span><b>${day ? eth(day) : 'next drop soon'}</b></div><div><span class="k-cap">APR${boost ? ' · 2x now' : ''}</span><b>${S.apr ? apr(S.apr * (boost ? 2 : 1)) : '·'}</b></div><div><span class="k-cap">Your share</span><b>${me ? (share * 100).toFixed(2) + '%' : '·'}</b></div></div>
+  <div class="st-stats"><div><span class="k-cap">Total staked</span><b>${tok(S.totalStaked)}</b></div><div><span class="k-cap">APR${boost ? ' · 2x now' : ''}</span><b>${S.apr ? apr(S.apr * (boost ? 2 : 1)) : '·'}</b></div><div><span class="k-cap">Your share</span><b>${me ? (share * 100).toFixed(2) + '%' : '·'}</b></div></div>
   <p class="st-note">APR is the current pace, not a promise: it moves with the total staked, the $HALBROOK price and what the platform earns.</p>
   <div class="st-card">${!who ? `<div class="st-act"><button class="pri" id="stConn">Connect wallet</button></div>` : `
     <div class="st-who">Wallet <b>${esc(who.slice(0, 6) + '…' + who.slice(-4))}</b>${BigInt(me.wallet) === 0n && BigInt(me.staked) === 0n ? ' · no $HALBROOK in this wallet. Switch account in your wallet if your tokens are in another one.' : ''}</div>
